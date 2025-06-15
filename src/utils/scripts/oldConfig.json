@@ -1,0 +1,133 @@
+{
+  "server_configs": {
+    "914516203609931816": {
+      "group_key": "gggtfm89iyo2o71m2tfq5v2ysizymv",
+      "api_key": "aey9mog3yctb2w79av2z69ixtrfmhp",
+      "enabled": true,
+      "alert_role": "1351308186518425750",
+      "users": {
+        "813244144335716363": "kite",
+        "352759918408892426": "uejogor5r4he9ziyebybftaimk6pmc",
+        "1158806428551757854": "test",
+        "324781081138298880": "udcvanbbwzhk3b1jpq1nezs1ftnygj",
+        "1352739006122819676": "test",
+        "368540379173093376": "uzqxjvhn3cuimmpf2mfi9yej43qzwx",
+        "833803565960658995": "u6n88ws18dq4uokhzwjx3pmu6i98nd",
+        "1072676437666046102": "uvaq3ishuzhvi5v5tq3t1j4ejj35ez",
+        "478928834536800319": "u1279f4x1e6y35ogyogf9dvi2nyhrt",
+        "365319980855721984": "u7iwoajtynxwk54u3xotenbej9zu1t",
+        "322494220680036352": "ua7vhqk3oxengkzp5arqne1ma3q4nt",
+        "695562873283280956": "uxuyyrr5xu63b4oa7s8uo28iin8ubh",
+        "765291713291747439": "u83k2e25ifxm4gshgiwmbj6etm9phz",
+        "836255434850566205": "u3ovjeo9wuoagc3h43rw419yuqgogj",
+        "227431369939222528": "ukpxyta4vzspe6o8j3kodst9bxj1yw",
+        "737840268866224138": "ukiba7j5q6kvnzngu6uowkbwkmptba",
+        "757993722397982821": "uaxxbq9ptudeh87b15mf6eh8h2nnw7",
+        "931486067150975046": "utrn3xof5k6ryajcwiqaoi181xn7as",
+        "300395507107495936": "u51qtapfo3oji82ypixto16d6h9yhp",
+        "763591815936475156": "u7g4b1gjixdsjf92xr4j3e9qhx9vme",
+        "333445830436454410": "ukdznf4bumqqqvy6zojteop7uftdea",
+        "563097822220779570": "uwog3b2hvov64fvze7eo9j2kiyfx5f",
+        "1241409330973245533": "ufjvrjnmhrc5qpvap8dzt16xg3nyq7",
+        "250624067768418305": "uwzge9z33dn1r73qgch2uy26vij758",
+        "709272957192634472": "u9ee8xq5m9emn1r8sdcaehut3g4js8",
+        "191298598732955649": "uo2i1kmfojpqn6vhgrkqkhcf1d16z1",
+        "370596357171576833": "un384pcqir23xr3cyfv2d6ebjshvxk",
+        "338586922081583104": "ubwn2czymymj4yf9bb77iiywx3ujin",
+        "850383932633514024": "u9mio58xxfj79yxb7hazuay4nbwdg8",
+        "253717229734985728": "ubheiwj2g5dzrtf9zyp7rtgetxp2wv",
+        "707628531336871936": "um3fj6i2xguteot815yvbbkq24ef6x",
+        "338360407666327552": "usgdrmdxnefkk2uoqntqw6r7h2s2yt",
+        "313806474348593156": "uzmaqrmwawus7dk8smym64rzovrt5p",
+        "261130408169701377": "uqp562cas6v3j2ohswv7m4f29ijbu3",
+        "424312255270617088": "urht6yz5525wp158jvqwcytmatyw3g",
+        "809607324775612436": "uf81bifzt8xyhawojqoezirkdoxgdb",
+        "920653515427299389": "uyy6g4j36jxz88n2dn8nhj3m8i17oe",
+        "428274906854195201": "umyvxue66xt117t6v2mqzvck2sy2or",
+        "427925075061112832": "uzj9bwb77u3rah33sudsuaptxg6wwd",
+        "559470168691179570": "u9qosw5sizugc5vy35s39hdaqwnx89",
+        "764159691151507497": "utw8up25h2gqgm1wvrryyqnyi14dha",
+        "952523978738655232": "u5fpoys2ji4eujciq4fc1zzb4s3ji2",
+        "755423062651830342": "u1xyj52m3zvdqrgpvc979184bhgd7s",
+        "277701867990155264": "u48ovufkp4156h8eots12u5uwrkykj",
+        "1252313358170980444": "uybznwx4b2oaetepyzpsu2tfd1u74c"
+      },
+      "degen_group_key": "gn1mh6ou1eqfpooy249289tymmxhb9",
+      "degen_alert_role": "1353936130382364732"
+    },
+    "1187512611793817630": {
+      "group_key": "g4tckmvvn4r8prfnd8yf2na3k5u21u",
+      "api_key": "amwdqqd4nhirh9qigfyg6fgdz38dpy",
+      "enabled": true,
+      "alert_role": "1356600875182985306",
+      "users": {
+        "694148386311503902": "uhctqpbdwai6czsjkrymns4ad28rhg",
+        "212256469838462978": "ukunim2n71hq3gvuctodhvftng4q1o",
+        "225059763438878722": "ungwtntzjgm4ymyni56p7v88ufw1oi"
+      }
+    },
+    "1326619108438966383": {
+      "group_key": "g34wuj16g9xftxxduju6xkmzm5rdfs",
+      "api_key": "ah7kd5njzzoihstyo8hzkc8tddeija",
+      "enabled": true,
+      "users": {
+        "559470168691179570": "u9qosw5sizugc5vy35s39hdaqwnx89",
+        "232932356036493316": "usr1gjpjv96fn3vdpui22opw7b2om2",
+        "573578830485389325": "u453jyv9msdcdsxc2vwkbzpm8qhzyh",
+        "765291713291747439": "u83k2e25ifxm4gshgiwmbj6etm9phz",
+        "770010696393949254": "uaiavgxiyf1ec5vttyu9zm66ey6z1w"
+      }
+    },
+    "1178917113470136322": {
+      "group_key": "gzu6qwnr9z6qwfwjjrbab4ete49avx",
+      "api_key": "aeqvixphjvbby4r5cqbadsujhu6zym",
+      "enabled": true,
+      "users": {
+        "222740512912703488": "ujdatq4saf8zq4sc41ru5sg3kdhamd",
+        "463050570589143051": "ubfgwz6s3idsezfqed5vycs5q4k1qs",
+        "1019376208753999963": "ucjo8n1sxtpfqadwwa4zwhsji1ocgy",
+        "938384707912081448": "uvq6iet9k1295jym6bvw6ri3k3xtdv",
+        "621765941314846751": "up38dm8p1ekgda282e971hrz4c114z",
+        "324781081138298880": "udcvanbbwzhk3b1jpq1nezs1ftnygj",
+        "285851517355950080": "ubre7rhsq52eg5u8iiv2bz73o945od",
+        "428550159018885121": "ucjmcggfb6i5jymb59mttd7agdbbop",
+        "277542504465694740": "upxtdnr3h682kzkafv9815b8g8n2cd",
+        "447853758932582400": "uigd9h39mf9sfvkfpfsaeykcwt6fxg",
+        "952523978738655232": "u5fpoys2ji4eujciq4fc1zzb4s3ji2",
+        "709272957192634472": "u9ee8xq5m9emn1r8sdcaehut3g4js8",
+        "264531114629005316": "ujjxssd13ecrdbavq75tcyejwtxyat",
+        "455665716742455297": "ujandeh9ja1c4seq9j1sk46994scwa",
+        "490917189231050756": "ubdncobm54su5yr5tyr1mcjk3e8uo1",
+        "933127770932928613": "ut3sqt2qkbeu73fjt2iu65ooohwzux",
+        "305639710695489537": "u3q3mm7i1cggwmy63r5thakd6mc5js",
+        "244648569359958016": "umzwdtjeht1pwxtynbqjum61cvdua2",
+        "184049558446145538": "uqcqkyt71nzgyxtyna87cmm9kd7uus",
+        "669365822711529517": "ucuyum25vwbb8azmx5pn3wptp6g7i1",
+        "457842092752764928": "ua88na5y5fypqvwzoc1qqf25t194h1",
+        "513853411846914050": "uuyn23m1sd2drxr9s726hyo2rqzyax",
+        "235419494812614656": "utvp4c5vod8e543t8yxstb4cjnx7po",
+        "321325515657183234": "u9zkgw7kc63m5i4xiuk6em2grz43kx",
+        "383349808045228044": "up2jkrmaebj3q35zkqgpwtm89vdnex",
+        "285490807979376651": "uugfamd73ptgjz51rf8h6sa35rtnkf",
+        "1014509596355866644": "um69v9xrckistimwp96ata47v3pp5a",
+        "694114993909530634": "u5ibrujsccnqspvjm8n81rgffiepxx"
+      }
+    },
+    "1255986517281603615": {
+      "group_key": "gewkpsoj924ypa3n8jv61i6k42ei8j",
+      "api_key": "agt97t5rj6p8pqhghmu9bdpdnn8fpq",
+      "enabled": true,
+      "users": {
+        "1072676437666046102": "uvaq3ishuzhvi5v5tq3t1j4ejj35ez",
+        "479889162963779596": "ugw32q9yufk4qnpbfykzs3qs9qt1sy"
+      },
+      "alert_role": "1257344761967284274",
+      "degen_alert_role": "1257344761967284274"
+    },
+    "1292147552661016647": {
+      "group_key": "gczvichfnk5h4a63ho6ttgsrjj9arh",
+      "api_key": "arfe4s59zmszc7h6q7oe28bfvowbqg",
+      "enabled": true
+    }
+  }
+}
