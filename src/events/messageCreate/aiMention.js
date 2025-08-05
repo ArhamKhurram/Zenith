@@ -4,6 +4,8 @@ const askGemini = require('../../utils/gemini');
 module.exports = async (client, message) => {
   if (message.author.bot) return;
 
+  if (message.mentions.everyone || message.mentions.roles.size > 0) return;
+
   if (message.mentions.has(client.user)) {
     const userInput = message.content.replace(/<@!?(\d+)>/, '').trim();
 

@@ -4,6 +4,7 @@ module.exports = async (client, message) => {
   const guildId = '914516203609931816';
   if (message.author.bot && message.author.id !== rickId) return;
 
+	console.log('Command loaded');
 
   // 🧠 Rick embed reaction logic
   if (
