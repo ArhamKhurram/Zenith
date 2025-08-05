@@ -1,8 +1,6 @@
 const PushoverConfig = require('../../models/PushoverConfig');
 const { devs } = require('../../../config.json'); // Make sure you have this set
 
-console.log(`Registering command "configurepushover".`);
-
 module.exports = {
   deleted: false,
   name: 'configurepushover',

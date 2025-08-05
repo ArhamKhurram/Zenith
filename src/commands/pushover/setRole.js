@@ -23,6 +23,10 @@ module.exports = {
           name: 'Degen Alert Permission',
           value: 'degenAlertRole',
         },
+        {
+          name: 'FNF Alert Permission',
+          value: 'fnfAlertRole',
+        },
       ],
     },
     {
@@ -37,9 +41,9 @@ module.exports = {
 
   callback: async (client, interaction) => {
     const role = interaction.options.getRole('role');
-    const roleType = interaction.options.getString('type'); // 'alertRole' or 'degenAlertRole'
+    const roleType = interaction.options.getString('type'); // 'alertRole', 'degenAlertRole', or 'fnfAlertRole'
 
-    if (!['alertRole', 'degenAlertRole'].includes(roleType)) {
+    if (!['alertRole', 'degenAlertRole', 'fnfAlertRole'].includes(roleType)) {
       return interaction.reply({ content: '❌ Invalid type specified.', ephemeral: true });
     }
 
@@ -49,7 +53,8 @@ module.exports = {
       { upsert: true }
     );
 
-    const readable = roleType === 'alertRole' ? 'normal alert' : 'degen alert';
+    const readable = roleType === 'alertRole' ? 'normal alert' : 
+                    roleType === 'degenAlertRole' ? 'degen alert' : 'FNF alert';
 
     await interaction.reply(`✅ Set <@&${role.id}> as the **${readable}** permission role.`);
   },

@@ -7,6 +7,7 @@ const pushoverConfigSchema = new Schema({
   degenGroupKey: { type: String },
   alertRole: { type: String },
   degenAlertRole: { type: String },
+  fnfAlertRole: { type: String },
   enabled: { type: Boolean, default: true },
   users: {
     type: Map,
