@@ -79,7 +79,9 @@ module.exports = {
             token: config.apiKey,
             user: userKey,
             message: message,
-            priority: 1,
+            priority: 2,
+            retry: 30,
+            expire: 1800,
           });
 
           if (title) params.append('title', title);
