@@ -9,6 +9,7 @@ const client = new Client({
     GatewayIntentBits.GuildMessages,
     GatewayIntentBits.MessageContent,
     GatewayIntentBits.GuildMembers,
+    GatewayIntentBits.GuildMessageReactions,
   ],
 });
 client.commands = new Collection();
@@ -16,14 +17,22 @@ client.commands = new Collection();
 // 🔧 This line was missing `()` at the end
 (async () => {
   try {
-    await mongoose.connect(process.env.MONGODB_URI);
+    console.log('🔄 Connecting to MongoDB...');
+    console.log('MongoDB URI:', process.env.MONGODB_URI ? 'Found' : 'Missing');
+    await mongoose.connect(process.env.MONGODB_URI, {
+      serverSelectionTimeoutMS: 5000, // 5 second timeout
+    });
     console.log('✅ Connected to MongoDB');
+    
+    console.log('🔄 Loading events...');
     eventHandler(client);
+    console.log('✅ Events loaded');
 
     // ✅ Login to Discord **after** MongoDB is ready
-    client.login(process.env.DISCORD_TOKEN);
+    console.log('🔄 Logging in to Discord...');
+    await client.login(process.env.DISCORD_TOKEN);
     console.log('✅ Logged in to Discord');
   } catch (error) {
-    console.error('❌ Error connecting to MongoDB:', error);
+    console.error('❌ Error:', error);
   }
 })();

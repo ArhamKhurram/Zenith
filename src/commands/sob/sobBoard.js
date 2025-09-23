@@ -1,26 +1,34 @@
-const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
+const { ApplicationCommandOptionType, EmbedBuilder } = require('discord.js');
 const Sob = require('../../models/Sobs');
 
 module.exports = {
-    data: new SlashCommandBuilder()
-        .setName('sob_leaderboard')
-        .setDescription('Display the sob leaderboard')
-        .addStringOption(option =>
-            option.setName('type')
-                .setDescription('Type of leaderboard to display')
-                .setRequired(false)
-                .addChoices(
-                    { name: 'Receivers (who got the most sobs)', value: 'receivers' },
-                    { name: 'Givers (who gives the most sobs)', value: 'givers' }
-                ))
-        .addIntegerOption(option =>
-            option.setName('limit')
-                .setDescription('Number of users to show (default: 50, max: 100)')
-                .setRequired(false)
-                .setMinValue(5)
-                .setMaxValue(100)),
+    deleted: false,
+    name: 'sob_leaderboard',
+    description: 'Display the sob leaderboard',
+    options: [
+        {
+            name: 'type',
+            description: 'Type of leaderboard to display',
+            type: ApplicationCommandOptionType.String,
+            required: false,
+            choices: [
+                { name: 'Receivers (who got the most sobs)', value: 'receivers' },
+                { name: 'Givers (who gives the most sobs)', value: 'givers' }
+            ]
+        },
+        {
+            name: 'limit',
+            description: 'Number of users to show (default: 50, max: 100)',
+            type: ApplicationCommandOptionType.Integer,
+            required: false,
+            min_value: 5,
+            max_value: 100
+        }
+    ],
+    permissionsRequired: [],
+    botPermissions: [],
 
-    async execute(interaction) {
+    callback: async (client, interaction) => {
         await interaction.deferReply();
 
         try {
