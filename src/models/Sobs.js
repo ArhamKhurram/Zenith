@@ -26,8 +26,8 @@ const sobSchema = new Schema({
     // Message information
     messageId: {
         type: String,
-        required: true,
-        unique: true // Prevents duplicate sob tracking for the same message
+        required: true
+        // Removed unique: true - multiple people can sob the same message
     },
     channelId: {
         type: String,
@@ -59,6 +59,7 @@ const sobSchema = new Schema({
 sobSchema.index({ guildId: 1, targetUserId: 1 }); // For user leaderboards per guild
 sobSchema.index({ guildId: 1, reactorId: 1 }); // For tracking who gives the most sobs
 sobSchema.index({ guildId: 1, createdAt: -1 }); // For recent sobs
+sobSchema.index({ messageId: 1, reactorId: 1 }, { unique: true }); // Prevent same user sobbing same message twice
 
 // Static methods for leaderboard queries
 sobSchema.statics.getTopSobReceivers = function(guildId, limit = 50) {
