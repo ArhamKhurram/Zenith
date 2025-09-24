@@ -18,7 +18,7 @@ module.exports = {
         },
         {
             name: 'limit',
-            description: 'Number of users to show (default: 50, max: 100)',
+            description: 'Number of users to show (default: 10, max: 100)',
             type: ApplicationCommandOptionType.Integer,
             required: false,
             min_value: 5,
@@ -33,7 +33,7 @@ module.exports = {
 
         try {
             const type = interaction.options.getString('type') || 'receivers';
-            const limit = interaction.options.getInteger('limit') || 50;
+            const limit = interaction.options.getInteger('limit') || 10;
             const guildId = interaction.guild.id;
 
             let leaderboard;
