@@ -2,6 +2,7 @@ require('dotenv').config();
 const { Client, GatewayIntentBits, Collection } = require('discord.js');
 const mongoose = require('mongoose');
 const eventHandler = require('./handlers/eventHandler');
+const { startRecapLogging } = require('./utils/recapLogger');
 
 const client = new Client({
   intents: [
@@ -27,6 +28,11 @@ client.commands = new Collection();
     console.log('🔄 Loading events...');
     eventHandler(client);
     console.log('✅ Events loaded');
+
+    // Initialize recap logging system
+    console.log('🎯 Initializing recap logging...');
+    await startRecapLogging(client);
+    console.log('✅ Recap logging initialized');
 
     // ✅ Login to Discord **after** MongoDB is ready
     console.log('🔄 Logging in to Discord...');

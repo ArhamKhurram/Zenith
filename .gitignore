@@ -72,3 +72,10 @@ Thumbs.db
 # Build output
 dist/
 build/
+
+# JSON exports and logs
+exports/
+*.json
+!package.json
+!config.json
+!fnf-keys.json
