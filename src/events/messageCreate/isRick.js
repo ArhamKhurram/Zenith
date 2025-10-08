@@ -137,10 +137,14 @@ const _callTranslate = async (text, retry = 0) => {
 
 module.exports = async (client, message) => {
   const rickId = '1081815963990761542';
-  const guildId = '914516203609931816';
+  // Hard-coded allowed guild IDs - add any guild IDs you want this to work in
+  const allowedGuildIds = new Set([
+    '914516203609931816',
+    '1411252468058427425'
+  ]);
 
   if (message.author.bot && message.author.id !== rickId) return;
-  if (!(message.author.id === rickId && message.guild && message.guild.id === guildId)) return;
+  if (!(message.author.id === rickId && message.guild && allowedGuildIds.has(message.guild.id))) return;
 
   // Only process when Rick posts (embeds optional)
   try {
