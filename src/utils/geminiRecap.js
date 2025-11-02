@@ -3,8 +3,7 @@ require('dotenv').config();
 
 const DEEPSEEK_KEY = process.env.DEEPSEEK_API_KEY;
 if (!DEEPSEEK_KEY) {
-    console.error('Missing DEEPSEEK_API_KEY environment variable. Set it in .env or your shell.');
-    process.exit(1);
+    console.warn('Missing DEEPSEEK_API_KEY environment variable. DeepSeek calls will be skipped and fallback summaries used.');
 }
 
 async function generateRecap(messages) {
@@ -66,20 +65,69 @@ Format:
 • [Key market event with full context and usernames involved]
 `;
 
-        const result = await model.generateContent(prompt);
-        const response = await result.response;
-        let recap = response.text();
+        // If no API key is configured, immediately return the safe fallback
+        if (!DEEPSEEK_KEY) {
+            console.warn('DEEPSEEK_API_KEY not set - returning fallback recap.');
+            throw new Error('DEEPSEEK_API_KEY not set');
+        }
 
-        // Replace timestamp placeholder
-        const now = new Date();
-        const timeString = now.toLocaleTimeString('en-US', { 
-            hour: '2-digit', 
-            minute: '2-digit' 
-        });
-        
-        // No timestamp replacement needed for new format
-        console.log(`✅ Recap generated successfully (${recap.length} characters)`);
-        return recap;
+        // Prepare DeepSeek request
+        const endpoint = 'https://api.deepseek.com/chat/completions';
+        const payload = {
+            model: process.env.DEEPSEEK_MODEL || 'gpt-4o-mini',
+            messages: [
+                { role: 'system', content: 'You are a concise crypto trading recap assistant.' },
+                { role: 'user', content: prompt }
+            ],
+            max_tokens: 1200
+        };
+
+        const MAX_ATTEMPTS = 3;
+        const TIMEOUT = 30000; // 30s
+
+        for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+            try {
+                const resp = await axios.post(endpoint, payload, {
+                    headers: {
+                        'Authorization': `Bearer ${DEEPSEEK_KEY}`,
+                        'Content-Type': 'application/json'
+                    },
+                    timeout: TIMEOUT
+                });
+
+                const data = resp.data || {};
+
+                // Flexible extraction for different response shapes
+                let recap = '';
+                if (data?.choices?.[0]?.message?.content) {
+                    recap = data.choices[0].message.content;
+                } else if (data?.choices?.[0]?.text) {
+                    recap = data.choices[0].text;
+                } else if (data?.output?.[0]?.content) {
+                    recap = data.output[0].content;
+                } else if (typeof data?.text === 'string') {
+                    recap = data.text;
+                } else {
+                    recap = JSON.stringify(data);
+                }
+
+                console.log(`✅ Recap generated successfully (${recap.length} characters)`);
+                return recap;
+
+            } catch (err) {
+                const retriable = !err.response || (err.response.status && err.response.status >= 500);
+                console.warn(`Attempt ${attempt} failed for DeepSeek: ${err.message}`);
+                if (attempt < MAX_ATTEMPTS && retriable) {
+                    const backoff = 1000 * Math.pow(2, attempt - 1);
+                    console.log(`⏳ Retrying DeepSeek in ${backoff}ms (attempt ${attempt + 1}/${MAX_ATTEMPTS})`);
+                    await new Promise(r => setTimeout(r, backoff));
+                    continue;
+                }
+
+                // On final failure, rethrow to trigger fallback below
+                throw err;
+            }
+        }
 
     } catch (error) {
         console.error('❌ Error generating recap with Gemini:', error);
@@ -144,11 +192,40 @@ Format as:
 [Your analysis here]
 `;
 
-        const result = await model.generateContent(megaPrompt);
-        const response = await result.response;
-        
-        console.log(`✅ Mega-recap generated successfully`);
-        return response.text();
+        // If no API key, return fallback
+        if (!DEEPSEEK_KEY) {
+            console.warn('DEEPSEEK_API_KEY not set - returning fallback mega-recap.');
+            return `**🌟 MEGA RECAP - Cross-Server Activity**\n\n📊 Processed activity from **${allServerRecaps.length}** servers\n\n*Mega-recap AI temporarily unavailable*`;
+        }
+
+        // Send to DeepSeek
+        try {
+            const endpoint = 'https://api.deepseek.com/chat/completions';
+            const payload = {
+                model: process.env.DEEPSEEK_MODEL || 'gpt-4o-mini',
+                messages: [
+                    { role: 'system', content: 'You are a friendly summarizer for multi-server recaps.' },
+                    { role: 'user', content: megaPrompt }
+                ],
+                max_tokens: 1500
+            };
+
+            const resp = await axios.post(endpoint, payload, {
+                headers: { 'Authorization': `Bearer ${DEEPSEEK_KEY}`, 'Content-Type': 'application/json' },
+                timeout: 30000
+            });
+
+            const data = resp.data || {};
+            if (data?.choices?.[0]?.message?.content) return data.choices[0].message.content;
+            if (data?.choices?.[0]?.text) return data.choices[0].text;
+            if (typeof data?.text === 'string') return data.text;
+
+            return JSON.stringify(data).slice(0, 4000);
+
+        } catch (err) {
+            console.error('❌ Error generating mega-recap:', err);
+            return `**🌟 MEGA RECAP - Cross-Server Activity**\n\n📊 Processed activity from **${allServerRecaps.length}** servers\n\n*Mega-recap AI temporarily unavailable*`;
+        }
 
     } catch (error) {
         console.error('❌ Error generating mega-recap:', error);
