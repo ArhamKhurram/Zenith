@@ -1,6 +1,7 @@
 const { ApplicationCommandOptionType } = require('discord.js');
 const LoggedMessage = require('../../models/LoggedMessage');
 const { generateRecap } = require('../../utils/geminiRecap');
+const axios = require('axios');
 
 module.exports = {
     deleted: false,
@@ -58,8 +59,55 @@ module.exports = {
                         `⏳ Generating AI recap...`
             });
 
-            // Generate recap using Gemini (DeepSeek)
-            const recapText = await generateRecap(recentMessages);
+            // Prepare payload for external recap API
+            const API_URL = process.env.RECAP_API_URL || process.env.GEMINI_API_URL;
+            if (!API_URL) throw new Error('Recap API URL not configured (process.env.RECAP_API_URL or GEMINI_API_URL)');
+
+            const payload = {
+                serverId,
+                minutes,
+                messages: recentMessages.map(m => ({
+                    id: m.messageId || m._id,
+                    author: m.authorTag || m.author || m.user,
+                    content: m.content || '',
+                    timestamp: (m.createdAt || m.timestamp || m.time) ? new Date(m.createdAt || m.timestamp || m.time).toISOString() : null,
+                    channel: m.channelId || m.channel || null
+                }))
+            };
+
+            // Send request via axios
+            const headers = {
+                'Content-Type': 'application/json'
+            };
+            if (process.env.RECAP_API_KEY) {
+                headers['Authorization'] = `Bearer ${process.env.RECAP_API_KEY}`;
+            }
+
+            let recapText;
+            try {
+                const resp = await axios.post(API_URL, payload, {
+                    headers,
+                    timeout: 60_000 // 60s
+                });
+
+                // Prefer different possible response shapes
+                if (resp && resp.data) {
+                    if (typeof resp.data === 'string') {
+                        recapText = resp.data;
+                    } else if (resp.data.recap) {
+                        recapText = resp.data.recap;
+                    } else if (resp.data.text) {
+                        recapText = resp.data.text;
+                    } else {
+                        recapText = JSON.stringify(resp.data, null, 2);
+                    }
+                } else {
+                    recapText = '*AI recap temporarily unavailable*';
+                }
+            } catch (apiError) {
+                console.error('❌ Recap API request failed:', apiError.message || apiError);
+                recapText = '*AI recap temporarily unavailable*';
+            }
 
             // Ensure recapText is a string and not too long for Discord messages
             let safeRecap = typeof recapText === 'string' ? recapText : JSON.stringify(recapText, null, 2);
