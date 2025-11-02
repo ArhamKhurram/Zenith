@@ -1,8 +1,4 @@
-const { GoogleGenerativeAI } = require('@google/generative-ai');
-
-// Initialize Gemini AI
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+const axios = require('axios');
 
 async function generateRecap(messages) {
     try {
@@ -12,10 +8,12 @@ async function generateRecap(messages) {
             return '📭 **Server Recap** - No activity in the last few minutes.';
         }
 
-        // Format messages for AI processing
-        const messageText = messages.map(msg => 
-            `[${msg.channelName}] ${msg.username}: ${msg.content}`
-        ).join('\n');
+        // Limit number of messages and total prompt size to avoid huge requests
+        const MAX_MESSAGES = 2000;
+        const MAX_PROMPT_CHARS = 15000;
+        const recent = messages.slice(-MAX_MESSAGES);
+        let messageText = recent.map(msg => `[${msg.channelName}] ${msg.username}: ${msg.content}`).join('\n');
+        if (messageText.length > MAX_PROMPT_CHARS) messageText = messageText.slice(-MAX_PROMPT_CHARS);
 
         const prompt = `
 You are creating ultra-concise crypto trading recaps. Analyze these messages and create SHORT, actionable summaries with proper context.
@@ -61,30 +59,59 @@ Format:
 • $TOKEN (CA: 0x123...) - [username] [action/context], [additional relevant details from related messages]
 • [username] mentioned [token/context] - [what it is, why it matters, any responses]
 • [Key market event with full context and usernames involved]
-`;
+        `;
 
-        const result = await model.generateContent(prompt);
-        const response = await result.response;
-        let recap = response.text();
+        // 🔹 DeepSeek API call
+        const DEEPSEEK_KEY = process.env.DEEPSEEK_API_KEY;
+        if (!DEEPSEEK_KEY) {
+            throw new Error('DEEPSEEK_API_KEY is not set');
+        }
 
-        // Replace timestamp placeholder
+        const response = await axios.post(
+            'https://api.deepseek.com/chat/completions',
+            {
+                model: 'deepseek-reasoner',
+                messages: [
+                    { role: 'system', content: 'You are a crypto trading recap generator.' },
+                    { role: 'user', content: prompt },
+                ],
+                temperature: 0.7,
+                max_tokens: 800,
+            },
+            {
+                headers: {
+                    'Authorization': `Bearer ${DEEPSEEK_KEY}`,
+                    'Content-Type': 'application/json',
+                },
+                timeout: 15000,
+            }
+        );
+
+        // Try multiple response shapes for robustness
+        const data = response && response.data ? response.data : {};
+        let recap =
+            data?.choices?.[0]?.message?.content ||
+            data?.choices?.[0]?.text ||
+            data?.text ||
+            (Array.isArray(data?.output) && data.output[0]?.content) ||
+            '';
+
+        if (!recap && typeof data === 'string') recap = data;
+        if (!recap) throw new Error('No recap text returned from DeepSeek');
+
         const now = new Date();
-        const timeString = now.toLocaleTimeString('en-US', { 
-            hour: '2-digit', 
-            minute: '2-digit' 
-        });
-        
-        // No timestamp replacement needed for new format
+        const timeString = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+        recap = String(recap).trim();
         console.log(`✅ Recap generated successfully (${recap.length} characters)`);
         return recap;
 
     } catch (error) {
-        console.error('❌ Error generating recap with Gemini:', error);
-        
-        // Fallback recap if AI fails
+        console.error('❌ Error generating recap with DeepSeek:', error?.response?.data || error);
+
+        // fallback logic
         const channelCounts = {};
         const userCounts = {};
-        
+
         messages.forEach(msg => {
             channelCounts[msg.channelName] = (channelCounts[msg.channelName] || 0) + 1;
             userCounts[msg.username] = (userCounts[msg.username] || 0) + 1;
@@ -93,7 +120,7 @@ Format:
         const topChannel = Object.keys(channelCounts).reduce((a, b) => 
             channelCounts[a] > channelCounts[b] ? a : b
         );
-        
+
         const topUser = Object.keys(userCounts).reduce((a, b) => 
             userCounts[a] > userCounts[b] ? a : b
         );
@@ -114,46 +141,4 @@ Format:
     }
 }
 
-// Function for future mega-recap processing
-async function generateMegaRecap(allServerRecaps) {
-    try {
-        console.log(`🌟 Generating MEGA-RECAP for ${allServerRecaps.length} servers...`);
-        
-        const serverSummaries = allServerRecaps.map(recap => 
-            `**${recap.serverName}:** ${recap.summary}`
-        ).join('\n\n');
-
-        const megaPrompt = `
-You are creating a MEGA RECAP across multiple Discord servers. This is a summary of summaries.
-
-Create an engaging overview of activity across all servers:
-- Keep under 500 words  
-- Use bold formatting and emojis
-- Identify cross-server trends
-- Highlight interesting patterns
-- Make it entertaining
-
-Server recaps to analyze:
-${serverSummaries}
-
-Format as:
-**🌟 MEGA RECAP - Cross-Server Activity**
-[Your analysis here]
-`;
-
-        const result = await model.generateContent(megaPrompt);
-        const response = await result.response;
-        
-        console.log(`✅ Mega-recap generated successfully`);
-        return response.text();
-
-    } catch (error) {
-        console.error('❌ Error generating mega-recap:', error);
-        return `**🌟 MEGA RECAP - Cross-Server Activity**\n\n📊 Processed activity from **${allServerRecaps.length}** servers\n\n*Mega-recap AI temporarily unavailable*`;
-    }
-}
-
-module.exports = {
-    generateRecap,
-    generateMegaRecap
-};
+module.exports = { generateRecap };
