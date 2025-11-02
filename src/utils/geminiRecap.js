@@ -1,9 +1,37 @@
 const axios = require('axios');
+const https = require('https');
 require('dotenv').config();
 
 const DEEPSEEK_KEY = process.env.DEEPSEEK_API_KEY;
 if (!DEEPSEEK_KEY) {
     console.warn('Missing DEEPSEEK_API_KEY environment variable. DeepSeek calls will be skipped and fallback summaries used.');
+}
+
+// Build a safe fallback recap when AI fails
+function buildFallback(messages) {
+    const channelCounts = {};
+    const userCounts = {};
+    messages.forEach(msg => {
+        channelCounts[msg.channelName] = (channelCounts[msg.channelName] || 0) + 1;
+        userCounts[msg.username] = (userCounts[msg.username] || 0) + 1;
+    });
+
+    const topChannel = Object.keys(channelCounts).length ? Object.keys(channelCounts).reduce((a, b) => 
+        channelCounts[a] > channelCounts[b] ? a : b
+    ) : 'general';
+
+    const topUser = Object.keys(userCounts).length ? Object.keys(userCounts).reduce((a, b) => 
+        userCounts[a] > userCounts[b] ? a : b
+    ) : 'unknown';
+
+    const now = new Date();
+    const timeString = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+
+    return `**Trading Recap • ${timeString}**\n\n` +
+        `• **${messages.length}** messages across **${Object.keys(channelCounts).length}** channels\n` +
+        `• Most active: **#${topChannel}** (${channelCounts[topChannel] || 0} messages)\n` +
+        `• Top trader: **${topUser}** (${userCounts[topUser] || 0} messages)\n\n` +
+        `*AI recap temporarily unavailable - showing basic activity*`;
 }
 
 async function generateRecap(messages) {
@@ -74,35 +102,55 @@ Format:
         // Prepare DeepSeek request
         const endpoint = 'https://api.deepseek.com/chat/completions';
         const payload = {
-            model: process.env.DEEPSEEK_MODEL || 'gpt-4o-mini',
+            model: process.env.DEEPSEEK_MODEL || 'deepseek-chat',
             messages: [
-                { role: 'system', content: 'You are a concise crypto trading recap assistant.' },
+                { role: 'system', content: 'You are a concise crypto trading recap assistant. Return ONLY the final 3-6 concise bullet points in plain text (no explanations, no chain-of-thought, no reasoning). Put the bullets in the assistant message content.' },
                 { role: 'user', content: prompt }
             ],
-            max_tokens: 1200
+            max_tokens: 1200,
+            reasoning_effort: 'low'
         };
 
-        const MAX_ATTEMPTS = 3;
-        const TIMEOUT = 30000; // 30s
+            const MAX_ATTEMPTS = 4;
+            const TIMEOUT = 60000; // 60s - increase to tolerate slower network
+            const MAX_PROMPT_CHARS = 16000; // safety truncation for very large message sets
+            const httpsAgent = new https.Agent({ keepAlive: false });
 
         for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
             try {
+                // Truncate prompt if it's extremely large to avoid connection issues
+                if (typeof payload.messages?.[1]?.content === 'string' && payload.messages[1].content.length > MAX_PROMPT_CHARS) {
+                    const original = payload.messages[1].content;
+                    payload.messages[1].content = original.slice(-MAX_PROMPT_CHARS);
+                    console.warn('DeepSeek prompt was truncated to', MAX_PROMPT_CHARS, 'chars to avoid oversized requests');
+                }
+
                 const resp = await axios.post(endpoint, payload, {
                     headers: {
                         'Authorization': `Bearer ${DEEPSEEK_KEY}`,
                         'Content-Type': 'application/json'
                     },
-                    timeout: TIMEOUT
+                    timeout: TIMEOUT,
+                    httpsAgent,
+                    maxBodyLength: Infinity,
+                    maxContentLength: Infinity
                 });
 
                 const data = resp.data || {};
 
-                // Flexible extraction for different response shapes
+                // Flexible extraction: prefer content, if empty use truncated reasoning_content (last 1000 chars)
                 let recap = '';
-                if (data?.choices?.[0]?.message?.content) {
-                    recap = data.choices[0].message.content;
-                } else if (data?.choices?.[0]?.text) {
-                    recap = data.choices[0].text;
+                const choice = data?.choices?.[0];
+                if (choice?.message?.content && choice.message.content.trim()) {
+                    recap = choice.message.content.trim();
+                } else if (choice?.message?.reasoning_content) {
+                    // Truncate reasoning_content to last 1000 chars, assuming final answer is at the end
+                    const reasoning = choice.message.reasoning_content;
+                    recap = reasoning.length > 1000 ? reasoning.slice(-1000) : reasoning;
+                } else if (choice?.message?.reasoning) {
+                    recap = typeof choice.message.reasoning === 'string' ? choice.message.reasoning : JSON.stringify(choice.message.reasoning);
+                } else if (choice?.text) {
+                    recap = choice.text;
                 } else if (data?.output?.[0]?.content) {
                     recap = data.output[0].content;
                 } else if (typeof data?.text === 'string') {
@@ -115,8 +163,50 @@ Format:
                 return recap;
 
             } catch (err) {
-                const retriable = !err.response || (err.response.status && err.response.status >= 500);
+                const status = err?.response?.status;
+                const retriable = !status || (status >= 500);
                 console.warn(`Attempt ${attempt} failed for DeepSeek: ${err.message}`);
+
+                // If client error (4xx), log concise info and return fallback immediately
+                if (status && status >= 400 && status < 500) {
+                    console.warn('DeepSeek client error:', status, err.response?.data || err.response?.statusText);
+
+                    // Specific handling: if the model doesn't exist, try again without specifying a model
+                    const serverMessage = err.response?.data?.error?.message || '';
+                    if (serverMessage.toLowerCase().includes('model not exist')) {
+                        try {
+                            console.log('DeepSeek model not found - retrying request without model field...');
+                            const fallbackPayload = Object.assign({}, payload);
+                            delete fallbackPayload.model;
+
+                                            const resp2 = await axios.post(endpoint, fallbackPayload, {
+                                headers: {
+                                    'Authorization': `Bearer ${DEEPSEEK_KEY}`,
+                                    'Content-Type': 'application/json'
+                                },
+                                timeout: TIMEOUT
+                            });
+                            const data2 = resp2.data || {};
+                            const ch2 = data2?.choices?.[0];
+                            let recap2 = '';
+                            if (ch2?.message?.content && ch2.message.content.trim()) recap2 = ch2.message.content.trim();
+                            else if (ch2?.message?.reasoning_content) {
+                                const reasoning = ch2.message.reasoning_content;
+                                recap2 = reasoning.length > 1000 ? reasoning.slice(-1000) : reasoning;
+                            }
+                            else if (ch2?.text) recap2 = ch2.text;
+                            else if (typeof data2?.text === 'string') recap2 = data2.text;
+                            else recap2 = JSON.stringify(data2);                                            console.log('✅ DeepSeek succeeded on fallback (no model).');
+                                            return recap2;
+                        } catch (err2) {
+                            console.warn('DeepSeek fallback (no model) failed:', err2.message, err2.response?.data || 'no body');
+                            return buildFallback(messages);
+                        }
+                    }
+
+                    return buildFallback(messages);
+                }
+
                 if (attempt < MAX_ATTEMPTS && retriable) {
                     const backoff = 1000 * Math.pow(2, attempt - 1);
                     console.log(`⏳ Retrying DeepSeek in ${backoff}ms (attempt ${attempt + 1}/${MAX_ATTEMPTS})`);
@@ -124,8 +214,9 @@ Format:
                     continue;
                 }
 
-                // On final failure, rethrow to trigger fallback below
-                throw err;
+                // Non-retriable or exhausted attempts: log and return fallback
+                console.error('DeepSeek failed after attempts:', err.message, err.response?.data || 'no response body');
+                return buildFallback(messages);
             }
         }
 
