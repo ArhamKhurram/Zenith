@@ -58,17 +58,26 @@ module.exports = {
                         `⏳ Generating AI recap...`
             });
 
-            // Generate recap using Gemini
+            // Generate recap using Gemini (DeepSeek)
             const recapText = await generateRecap(recentMessages);
-            
+
+            // Ensure recapText is a string and not too long for Discord messages
+            let safeRecap = typeof recapText === 'string' ? recapText : JSON.stringify(recapText, null, 2);
+            const MAX_LEN = 1800;
+            let truncated = false;
+            if (safeRecap.length > MAX_LEN) {
+                safeRecap = safeRecap.slice(0, MAX_LEN) + '\n\n...(truncated)';
+                truncated = true;
+            }
+
             // Send the test recap
             await interaction.editReply({
-                content: `✅ **Test Recap Generated!**\n\n${recapText}\n\n` +
-                        `📊 **Test Results:**\n` +
-                        `• Messages processed: **${recentMessages.length}**\n` +
-                        `• Time range: **${minutes} minutes**\n` +
-                        `• Recap length: **${recapText.length}** characters\n` +
-                        `• Status: ${recapText.includes('*AI recap temporarily unavailable*') ? '⚠️ Fallback used' : '✅ AI generated'}`
+                content: `✅ **Test Recap Generated!**\n\n${safeRecap}\n\n` +
+                         `📊 **Test Results:**\n` +
+                         `• Messages processed: **${recentMessages.length}**\n` +
+                         `• Time range: **${minutes} minutes**\n` +
+                         `• Recap length: **${String(recapText).length}** characters\n` +
+                         `• Status: ${String(recapText).includes('*AI recap temporarily unavailable*') ? '⚠️ Fallback used' : '✅ AI generated'}${truncated ? ' (truncated)' : ''}`
             });
 
             console.log(`✅ Test recap completed for ${interaction.guild.name}`);
