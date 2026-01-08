@@ -39,19 +39,34 @@ module.exports = {
     }
 
     try {
-      // Load FNF user keys from JSON file
+      // Load FNF user keys from JSON file (supports legacy array of strings or new array of {name,key})
       const fnfKeysPath = path.join(__dirname, '../../../fnf-keys.json');
-      let fnfKeys;
-      
+      let fnfKeysRaw;
       try {
         const fnfKeysData = await fs.readFile(fnfKeysPath, 'utf8');
-        fnfKeys = JSON.parse(fnfKeysData);
+        fnfKeysRaw = JSON.parse(fnfKeysData);
       } catch (err) {
         return interaction.reply({ content: '❌ FNF keys file not found or invalid. Please check fnf-keys.json', ephemeral: true });
       }
 
-      if (!Array.isArray(fnfKeys) || fnfKeys.length === 0) {
+      if (!Array.isArray(fnfKeysRaw) || fnfKeysRaw.length === 0) {
         return interaction.reply({ content: '❌ No FNF user keys found in the configuration.', ephemeral: true });
+      }
+
+      // Normalize entries to { name, key }
+      const fnfKeys = fnfKeysRaw.map((entry, idx) => {
+        if (typeof entry === 'string') return { name: null, key: entry };
+        if (entry && typeof entry === 'object') {
+          // accept either `key` or `user` or `token` as the key field
+          const key = entry.key || entry.user || entry.token || null;
+          const name = entry.name || entry.displayName || null;
+          return { name, key };
+        }
+        return { name: null, key: null };
+      }).filter(e => e.key);
+
+      if (fnfKeys.length === 0) {
+        return interaction.reply({ content: '❌ No valid FNF user keys found in the configuration.', ephemeral: true });
       }
 
       // Send initial response
@@ -62,24 +77,23 @@ module.exports = {
       const errors = [];
 
       // Send alerts to each user individually
-      for (const userKey of fnfKeys) {
+      for (const entry of fnfKeys) {
         try {
           const params = new URLSearchParams({
             token: config.apiKey,
-            user: userKey,
+            user: entry.key,
             message: message,
             priority: 2,
             retry: 30,
             expire: 1800,
           });
 
-          // No title/url support -- only send the message
-
           await axios.post('https://api.pushover.net/1/messages.json', params);
           successCount++;
         } catch (err) {
           failureCount++;
-          errors.push(`User key ${userKey}: ${err.response?.data?.errors?.[0] || err.message}`);
+          const label = entry.name ? `${entry.name} (${entry.key})` : entry.key;
+          errors.push(`${label}: ${err.response?.data?.errors?.[0] || err.message}`);
         }
       }
 

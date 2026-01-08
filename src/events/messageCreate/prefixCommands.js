@@ -4,10 +4,20 @@ module.exports = async (client, message) => {
     if (message.author.bot) return;
     if (!message.content || typeof message.content !== 'string') return;
 
-    const PREFIX = 'z!';
-    if (!message.content.startsWith(PREFIX)) return;
+    // Load configured prefixes from root config.json if available, fallback to ['z!']
+    let prefixes = ['z!'];
+    try {
+      // eslint-disable-next-line global-require
+      const cfg = require('../../../config.json');
+      if (Array.isArray(cfg.prefixes) && cfg.prefixes.length) prefixes = cfg.prefixes;
+    } catch (e) {
+      // ignore and use default
+    }
 
-    const withoutPrefix = message.content.slice(PREFIX.length).trim();
+    const usedPrefix = prefixes.find(p => message.content.startsWith(p));
+    if (!usedPrefix) return;
+
+    const withoutPrefix = message.content.slice(usedPrefix.length).trim();
     if (!withoutPrefix) return;
 
     const parts = withoutPrefix.split(/\s+/);
