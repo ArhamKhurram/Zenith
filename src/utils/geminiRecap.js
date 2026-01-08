@@ -104,7 +104,7 @@ Format:
         const payload = {
             model: process.env.DEEPSEEK_MODEL || 'deepseek-chat',
             messages: [
-                { role: 'system', content: 'You are a concise crypto trading recap assistant. Return ONLY the final 3-6 concise bullet points in plain text (no explanations, no chain-of-thought, no reasoning). Put the bullets in the assistant message content.' },
+                { role: 'system', content: 'Respond ONLY with final bullet points. Never include your reasoning, thinking process, or self-checks. Format strictly as:\n• Point 1\n• Point 2\n• Point 3' },
                 { role: 'user', content: prompt }
             ],
             max_tokens: 1200,

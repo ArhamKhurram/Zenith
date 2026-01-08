@@ -18,24 +18,13 @@ module.exports = {
       required: true,
       type: ApplicationCommandOptionType.String,
     },
-    {
-      name: 'title',
-      description: 'Optional title for the alert.',
-      type: ApplicationCommandOptionType.String,
-    },
-    {
-      name: 'url',
-      description: 'Optional URL to include.',
-      type: ApplicationCommandOptionType.String,
-    },
   ],
   permissionsRequired: [],
   botPermissions: [PermissionFlagsBits.SendMessages],
 
   callback: async (client, interaction) => {
     const message = interaction.options.getString('message');
-    const title = interaction.options.getString('title');
-    const url = interaction.options.getString('url');
+  // Only message is required now
 
     // Check if Pushover is configured
     const config = await PushoverConfig.findOne({ guildId: interaction.guild.id });
@@ -84,8 +73,7 @@ module.exports = {
             expire: 1800,
           });
 
-          if (title) params.append('title', title);
-          if (url) params.append('url', url);
+          // No title/url support -- only send the message
 
           await axios.post('https://api.pushover.net/1/messages.json', params);
           successCount++;
