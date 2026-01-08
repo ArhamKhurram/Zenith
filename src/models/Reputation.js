@@ -1,15 +1,10 @@
-const { Schema, model } = require('mongoose');
+// Reputation model stub: the reputation system has been removed.
+// This stub provides safe no-op methods so any remaining requires won't crash.
 
-const reputationSchema = new Schema({
-  userId: { type: String, required: true },
-  guildId: { type: String, required: true },
-  goodRep: { type: Number, default: 0 },
-  badRep: { type: Number, default: 0 },
-  totalReputation: { type: Number, default: 0 },
-  lastUpdated: { type: Date, default: Date.now },
-}, { timestamps: true });
-
-// Prevent duplicate rep per user per guild
-reputationSchema.index({ userId: 1, guildId: 1 }, { unique: true });
-
-module.exports = model('Reputation', reputationSchema);
+module.exports = {
+  findOne: async () => null,
+  find: async () => [],
+  create: async (obj) => ({ ...obj }),
+  // generic fallback
+  __removed: true,
+};
