@@ -9,7 +9,7 @@ const PushoverConfig = require('../models/PushoverConfig');
  */
 class PriceMonitor {
   constructor() {
-    this.alerts = []; // { id, user_name, token_address, target_price, operator, user_id, guild_id }
+    this.alerts = []; // { id, user_name, token_address, token_ticker, token_name, target_price, operator, user_id, guild_id }
     // Jupiter public API key (optional). Set JUPITER_API_KEY if you want to supply a key.
     this.apiKey = process.env.JUPITER_API_KEY || null;
     this.pollIntervalMs = 10000; // 10s
@@ -64,7 +64,7 @@ class PriceMonitor {
     return 'solana';
   }
 
-  addAlert({ user_name, token_address, target_price, operator = 'above', user_id = null, guild_id = null }) {
+  addAlert({ user_name, token_address, token_ticker = null, token_name = null, target_price, operator = 'above', user_id = null, guild_id = null }) {
     if (!user_name || !token_address || !target_price || !user_id || !guild_id) throw new Error('Missing fields');
     if (!this._validateAddress(token_address)) throw new Error('Invalid token address');
 
@@ -76,6 +76,8 @@ class PriceMonitor {
       id,
       user_name: String(user_name),
       token_address: String(token_address),
+      token_ticker: token_ticker ? String(token_ticker) : null,
+      token_name: token_name ? String(token_name) : null,
       target_price: Number(target_price),
       operator,
       user_id: String(user_id),
@@ -137,7 +139,22 @@ class PriceMonitor {
     const headers = {};
     if (this.apiKey) headers['x-api-key'] = this.apiKey;
 
-    const resp = await axios.get(endpoint, { headers, timeout: 15000 });
+    let resp;
+    try {
+      resp = await axios.get(endpoint, { headers, timeout: 15000 });
+    } catch (err) {
+      // If the API key was rejected, retry without it (public Jupiter endpoints often work without a key)
+      if (err && err.response && (err.response.status === 401 || err.response.status === 403) && this.apiKey) {
+        console.warn('priceMonitor: Jupiter API key rejected (401/403). Retrying without API key.');
+        try {
+          resp = await axios.get(endpoint, { timeout: 15000 });
+        } catch (err2) {
+          throw err2;
+        }
+      } else {
+        throw err;
+      }
+    }
     this.callTimestamps.push(now);
 
     // Normalize response into mapping addr -> numeric price
@@ -158,20 +175,23 @@ class PriceMonitor {
       this.lastCheck = new Date().toISOString();
       return;
     }
-
-    // extract unique addresses (up to maxPerRequest) and fetch in one batched call
-    const unique = [...new Set(this.alerts.map(a => a.token_address))].slice(0, this.maxPerRequest);
+    // extract unique addresses and fetch in chunks (handles >maxPerRequest tokens)
+    const unique = [...new Set(this.alerts.map(a => a.token_address))];
     try {
-      const data = await this._fetchPrices(unique);
       this.lastCheck = new Date().toISOString();
       this.apiStatus = { ok: true, lastError: null };
 
       // Map token -> price
       const priceMap = {};
-      for (const addr of Object.keys(data)) {
-        const entry = data[addr];
-        const price = entry && (entry.value || entry.price || entry.usd || entry.value_usd) ? (entry.value || entry.price || entry.usd || entry.value_usd) : null;
-        priceMap[addr] = Number(price || 0);
+      for (let i = 0; i < unique.length; i += this.maxPerRequest) {
+        const chunk = unique.slice(i, i + this.maxPerRequest);
+        // fetch prices for this chunk
+        const data = await this._fetchPrices(chunk);
+        for (const addr of Object.keys(data)) {
+          const entry = data[addr];
+          const price = entry && (entry.value || entry.price || entry.usd || entry.value_usd) ? (entry.value || entry.price || entry.usd || entry.value_usd) : null;
+          priceMap[addr] = Number(price || 0);
+        }
       }
 
       // Iterate alerts copy so we can remove triggered ones
@@ -187,13 +207,15 @@ class PriceMonitor {
             // Try to send Pushover to the user's linked key for this guild
             try {
               const cfg = await PushoverConfig.findOne({ guildId: alert.guild_id });
-              if (cfg && cfg.users && cfg.users.has(alert.user_id)) {
+                if (cfg && cfg.users && cfg.users.has(alert.user_id)) {
                 const userKey = cfg.users.get(alert.user_id);
                 const params = new URLSearchParams();
                 params.append('token', cfg.apiKey);
                 params.append('user', userKey);
-                params.append('message', `Price alert for ${alert.token_address}: target ${alert.operator} ${alert.target_price} reached (current ${curPrice}).`);
-                params.append('title', `Price Alert: ${alert.token_address}`);
+                const title = alert.token_ticker ? `Price Alert: ${alert.token_ticker}` : `Price Alert: ${alert.token_address}`;
+                const message = alert.token_ticker ? `${alert.token_ticker} (${alert.token_name || alert.token_address}): target ${alert.operator} ${alert.target_price} reached — current ${curPrice}` : `Price alert for ${alert.token_address}: target ${alert.operator} ${alert.target_price} reached (current ${curPrice}).`;
+                params.append('message', message);
+                params.append('title', title);
                 params.append('priority', 1);
                 await axios.post('https://api.pushover.net/1/messages.json', params, { timeout: 10000 });
               }
@@ -207,11 +229,11 @@ class PriceMonitor {
                 const user = await this.client.users.fetch(alert.user_id).catch(() => null);
                 if (user && typeof user.send === 'function') {
                   const embed = {
-                    title: `Price Alert: ${alert.token_address}`,
-                    description: `Target ${alert.operator} ${alert.target_price} reached. Current: ${curPrice}`,
+                    title: alert.token_ticker ? `Price Alert: ${alert.token_ticker}` : `Price Alert: ${alert.token_address}`,
+                    description: alert.token_ticker ? `${alert.token_ticker} (${alert.token_name || alert.token_address}) — Target ${alert.operator} ${alert.target_price} reached. Current: ${curPrice}` : `Target ${alert.operator} ${alert.target_price} reached. Current: ${curPrice}`,
                     color: 16753920,
                     fields: [
-                      { name: 'Token', value: alert.token_address, inline: false },
+                      { name: 'Token', value: alert.token_ticker ? `${alert.token_ticker} (${alert.token_name || alert.token_address})` : alert.token_address, inline: false },
                       { name: 'Target', value: String(alert.target_price), inline: true },
                       { name: 'Current', value: String(curPrice), inline: true },
                     ],
