@@ -1,6 +1,6 @@
 const { ApplicationCommandOptionType, PermissionFlagsBits } = require('discord.js');
-const fs = require('fs').promises;
-const path = require('path');
+const fnfStore = require('../../utils/fnfStore');
+
 
 module.exports = {
   deleted: false,
@@ -35,28 +35,17 @@ module.exports = {
 
       if (!userKey) return interaction.reply({ content: '❌ Invalid key provided.', ephemeral: true });
 
-      const keysPath = path.join(__dirname, '../../../fnf-keys.json');
-      let existing = [];
+      // Use MongoDB-backed storage (migrates from fnf-keys.json automatically if present)
       try {
-        const raw = await fs.readFile(keysPath, 'utf8');
-        existing = JSON.parse(raw) || [];
-        if (!Array.isArray(existing)) existing = [];
+        const existing = await fnfStore.listAll();
+        if (existing.some(e => e.key === userKey)) {
+          return interaction.reply({ content: 'ℹ️ Your key is already registered for FNF alerts.', ephemeral: true });
+        }
       } catch (e) {
-        existing = [];
+        // ignore and continue
       }
 
-      // Normalize to objects
-      const normalized = existing.map(e => (typeof e === 'string' ? { name: null, key: e } : (e && typeof e === 'object' ? { name: e.name || null, key: e.key || e.user || e.token || null } : { name: null, key: null }))).filter(e => e.key);
-
-      // Prevent duplicates
-      if (normalized.some(e => e.key === userKey)) {
-        return interaction.reply({ content: 'ℹ️ Your key is already registered for FNF alerts.', ephemeral: true });
-      }
-
-      normalized.push({ name: displayName, key: userKey });
-
-      await fs.writeFile(keysPath, JSON.stringify(normalized, null, 2), 'utf8');
-
+      await fnfStore.add({ name: displayName, key: userKey, addedBy: interaction.user.id, guildId: interaction.guild.id });
       return interaction.reply({ content: `✅ Registered ${displayName} for FNF alerts.`, ephemeral: true });
     } catch (err) {
       console.error('fnf-join error:', err);

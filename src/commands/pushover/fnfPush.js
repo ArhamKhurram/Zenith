@@ -39,34 +39,17 @@ module.exports = {
     }
 
     try {
-      // Load FNF user keys from JSON file (supports legacy array of strings or new array of {name,key})
-      const fnfKeysPath = path.join(__dirname, '../../../fnf-keys.json');
-      let fnfKeysRaw;
+      // Load FNF user keys from MongoDB (migrates from fnf-keys.json if present)
+      const fnfStore = require('../../utils/fnfStore');
+      let fnfKeys;
       try {
-        const fnfKeysData = await fs.readFile(fnfKeysPath, 'utf8');
-        fnfKeysRaw = JSON.parse(fnfKeysData);
+        fnfKeys = await fnfStore.listAll();
       } catch (err) {
-        return interaction.reply({ content: '❌ FNF keys file not found or invalid. Please check fnf-keys.json', ephemeral: true });
+        return interaction.reply({ content: '❌ Failed to load FNF keys from database.', ephemeral: true });
       }
 
-      if (!Array.isArray(fnfKeysRaw) || fnfKeysRaw.length === 0) {
+      if (!Array.isArray(fnfKeys) || fnfKeys.length === 0) {
         return interaction.reply({ content: '❌ No FNF user keys found in the configuration.', ephemeral: true });
-      }
-
-      // Normalize entries to { name, key }
-      const fnfKeys = fnfKeysRaw.map((entry, idx) => {
-        if (typeof entry === 'string') return { name: null, key: entry };
-        if (entry && typeof entry === 'object') {
-          // accept either `key` or `user` or `token` as the key field
-          const key = entry.key || entry.user || entry.token || null;
-          const name = entry.name || entry.displayName || null;
-          return { name, key };
-        }
-        return { name: null, key: null };
-      }).filter(e => e.key);
-
-      if (fnfKeys.length === 0) {
-        return interaction.reply({ content: '❌ No valid FNF user keys found in the configuration.', ephemeral: true });
       }
 
       // Send initial response
