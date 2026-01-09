@@ -1,16 +1,17 @@
 const axios = require('axios');
 const fs = require('fs').promises;
 const path = require('path');
+const PushoverConfig = require('../models/PushoverConfig');
 
 /**
- * Multi-chain token price monitor using Birdeye multi_price endpoint.
+ * Multi-chain token price monitor using Jupiter price API (api.jup.ag).
  * Stores alerts in-memory with optional persistence to fnf-monitor-alerts.json
  */
 class PriceMonitor {
   constructor() {
-    this.alerts = []; // { id, user_name, token_address, target_price, discord_webhook_url }
-    // Birdeye is a public endpoint; API key header is optional. Only use BIRDEYE_API_KEY if set.
-    this.apiKey = process.env.BIRDEYE_API_KEY || null;
+    this.alerts = []; // { id, user_name, token_address, target_price, operator, user_id, guild_id }
+    // Jupiter public API key (optional). Set JUPITER_API_KEY if you want to supply a key.
+    this.apiKey = process.env.JUPITER_API_KEY || null;
     this.pollIntervalMs = 10000; // 10s
     this.timer = null;
     this.lastCheck = null;
@@ -19,6 +20,11 @@ class PriceMonitor {
     this.persistPath = path.join(__dirname, '..', '..', 'fnf-monitor-alerts.json');
     this.maxPerRequest = 100;
     this._loadFromDisk().catch(() => {});
+  }
+
+  // Inject the discord client so monitor can post messages via the bot (channel/DM)
+  setClient(client) {
+    this.client = client;
   }
 
   async _loadFromDisk() {
@@ -49,26 +55,32 @@ class PriceMonitor {
     return eth.test(s) || base58.test(s) || generic.test(s);
   }
 
+  // Chain detection remains for future use; currently Jupiter handles multi-token price queries.
   _detectChain(address) {
     if (!address || typeof address !== 'string') return 'solana';
     const s = address.trim();
     if (/^0x[0-9a-fA-F]{40}$/.test(s)) return 'ethereum';
     if (/^[1-9A-HJ-NP-Za-km-z]{32,64}$/.test(s)) return 'solana';
-    // fallback default
     return 'solana';
   }
 
-  _validateWebhook(url) {
-    if (!url || typeof url !== 'string') return false;
-    return url.startsWith('https://discord.com/api/webhooks/') || url.startsWith('https://canary.discord.com/api/webhooks/') || url.startsWith('https://ptb.discord.com/api/webhooks/');
-  }
-
-  addAlert({ user_name, token_address, target_price, discord_webhook_url }) {
-    if (!user_name || !token_address || !target_price || !discord_webhook_url) throw new Error('Missing fields');
+  addAlert({ user_name, token_address, target_price, operator = 'above', user_id = null, guild_id = null }) {
+    if (!user_name || !token_address || !target_price || !user_id || !guild_id) throw new Error('Missing fields');
     if (!this._validateAddress(token_address)) throw new Error('Invalid token address');
-    if (!this._validateWebhook(discord_webhook_url)) throw new Error('Invalid webhook URL');
+
+    const allowedOps = ['above', 'below'];
+    if (!allowedOps.includes(operator)) operator = 'above';
+
     const id = `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
-    const alert = { id, user_name: String(user_name), token_address: String(token_address), target_price: Number(target_price), discord_webhook_url: String(discord_webhook_url) };
+    const alert = {
+      id,
+      user_name: String(user_name),
+      token_address: String(token_address),
+      target_price: Number(target_price),
+      operator,
+      user_id: String(user_id),
+      guild_id: String(guild_id),
+    };
     this.alerts.push(alert);
     this._saveToDisk().catch(() => {});
     return alert;
@@ -110,7 +122,7 @@ class PriceMonitor {
     };
   }
 
-  async _fetchPrices(addresses, chain = 'solana') {
+  async _fetchPrices(addresses) {
     if (!Array.isArray(addresses) || addresses.length === 0) return {};
     // Rate limiting: record and ensure we don't exceed ~60/min
     const now = Date.now();
@@ -119,14 +131,26 @@ class PriceMonitor {
       throw new Error('Rate limit would be exceeded, skipping fetch');
     }
 
-    const endpoint = `https://public-api.birdeye.so/defi/multi_price?list_address=${addresses.join(',')}`;
+    // Jupiter API: supports multiple ids comma-separated
+    const ids = addresses.join(',');
+    const endpoint = `https://api.jup.ag/price/v3?ids=${encodeURIComponent(ids)}`;
     const headers = {};
-    if (this.apiKey) headers['X-API-KEY'] = this.apiKey;
-    // Birdeye requires chain header to disambiguate results
-    headers['x-chain'] = chain;
+    if (this.apiKey) headers['x-api-key'] = this.apiKey;
+
     const resp = await axios.get(endpoint, { headers, timeout: 15000 });
     this.callTimestamps.push(now);
-    return resp.data && resp.data.data ? resp.data.data : {};
+
+    // Normalize response into mapping addr -> numeric price
+    const result = {};
+    const body = resp.data || {};
+    // Jupiter may return an object mapping ids to price objects, or a `data` field
+    const source = (body && typeof body === 'object') ? (body.data || body) : {};
+    for (const k of Object.keys(source)) {
+      const entry = source[k] || {};
+      const price = entry.price ?? entry.priceUsd ?? entry.price_usd ?? entry.usd ?? entry.value ?? null;
+      result[k] = Number(price || 0);
+    }
+    return result;
   }
 
   async _tick() {
@@ -135,25 +159,10 @@ class PriceMonitor {
       return;
     }
 
-    // extract unique addresses and group by detected chain
-    const uniqueAll = [...new Set(this.alerts.map(a => a.token_address))];
-    const grouped = {};
-    for (const addr of uniqueAll) {
-      const chain = this._detectChain(addr);
-      grouped[chain] = grouped[chain] || [];
-      grouped[chain].push(addr);
-    }
-
+    // extract unique addresses (up to maxPerRequest) and fetch in one batched call
+    const unique = [...new Set(this.alerts.map(a => a.token_address))].slice(0, this.maxPerRequest);
     try {
-      // fetch per-chain (each up to maxPerRequest)
-      const combinedData = {};
-      for (const chain of Object.keys(grouped)) {
-        const addrs = grouped[chain].slice(0, this.maxPerRequest);
-        if (addrs.length === 0) continue;
-        const data = await this._fetchPrices(addrs, chain);
-        Object.assign(combinedData, data || {});
-      }
-      const data = combinedData;
+      const data = await this._fetchPrices(unique);
       this.lastCheck = new Date().toISOString();
       this.apiStatus = { ok: true, lastError: null };
 
@@ -169,12 +178,53 @@ class PriceMonitor {
       const alertsCopy = this.alerts.slice();
       for (const alert of alertsCopy) {
         const curPrice = priceMap[alert.token_address] || 0;
-        if (curPrice >= alert.target_price) {
-          // trigger
+        let triggered = false;
+        if (alert.operator === 'above') triggered = curPrice >= alert.target_price;
+        if (alert.operator === 'below') triggered = curPrice <= alert.target_price;
+
+        if (triggered) {
           try {
-            await this._sendWebhook(alert, curPrice);
+            // Try to send Pushover to the user's linked key for this guild
+            try {
+              const cfg = await PushoverConfig.findOne({ guildId: alert.guild_id });
+              if (cfg && cfg.users && cfg.users.has(alert.user_id)) {
+                const userKey = cfg.users.get(alert.user_id);
+                const params = new URLSearchParams();
+                params.append('token', cfg.apiKey);
+                params.append('user', userKey);
+                params.append('message', `Price alert for ${alert.token_address}: target ${alert.operator} ${alert.target_price} reached (current ${curPrice}).`);
+                params.append('title', `Price Alert: ${alert.token_address}`);
+                params.append('priority', 1);
+                await axios.post('https://api.pushover.net/1/messages.json', params, { timeout: 10000 });
+              }
+            } catch (e) {
+              console.warn('Pushover send failed for alert', alert.id, e && e.message);
+            }
+
+            // Also DM the user via the bot (best-effort)
+            try {
+              if (this.client && alert.user_id) {
+                const user = await this.client.users.fetch(alert.user_id).catch(() => null);
+                if (user && typeof user.send === 'function') {
+                  const embed = {
+                    title: `Price Alert: ${alert.token_address}`,
+                    description: `Target ${alert.operator} ${alert.target_price} reached. Current: ${curPrice}`,
+                    color: 16753920,
+                    fields: [
+                      { name: 'Token', value: alert.token_address, inline: false },
+                      { name: 'Target', value: String(alert.target_price), inline: true },
+                      { name: 'Current', value: String(curPrice), inline: true },
+                    ],
+                    timestamp: new Date().toISOString(),
+                  };
+                  await user.send({ embeds: [embed] }).catch(() => null);
+                }
+              }
+            } catch (e) {
+              console.warn('DM send failed for alert', alert.id, e && e.message);
+            }
           } catch (e) {
-            console.warn('Failed to send webhook for alert', alert.id, e && e.message);
+            console.warn('Failed to process alert', alert.id, e && e.message);
           }
           this.removeAlert(alert.id);
         }
@@ -184,27 +234,6 @@ class PriceMonitor {
       this.lastCheck = new Date().toISOString();
       console.error('priceMonitor fetch error:', err && err.message);
     }
-  }
-
-  async _sendWebhook(alert, currentPrice) {
-    const payload = {
-      embeds: [
-        {
-          title: `Price Alert: ${alert.token_address}`,
-          description: `Target reached for **${alert.user_name}**`,
-          color: 16753920,
-          fields: [
-            { name: 'Token', value: alert.token_address, inline: false },
-            { name: 'Target Price', value: String(alert.target_price), inline: true },
-            { name: 'Current Price', value: String(currentPrice), inline: true },
-          ],
-          timestamp: new Date().toISOString(),
-        },
-      ],
-      username: 'Price Monitor',
-    };
-
-    await axios.post(alert.discord_webhook_url, payload, { headers: { 'Content-Type': 'application/json' }, timeout: 10000 });
   }
 }
 
