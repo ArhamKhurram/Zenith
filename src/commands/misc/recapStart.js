@@ -16,11 +16,11 @@ module.exports = {
         },
         {
             name: 'interval',
-            description: 'Minutes between recaps (default: 10)',
+            description: 'Hours between recaps (default: 1)',
             type: ApplicationCommandOptionType.Integer,
             required: false,
-            min_value: 5,
-            max_value: 60
+            min_value: 1,
+            max_value: 24
         }
     ],
     //permissionsRequired: [PermissionFlagsBits.ManageChannels],
@@ -28,7 +28,7 @@ module.exports = {
 
     callback: async (client, interaction) => {
         const channel = interaction.options.getChannel('channel');
-        const interval = interaction.options.getInteger('interval') || 10;
+        const interval = interaction.options.getInteger('interval') || 1;
         const serverId = interaction.guild.id;
 
         // Check if channel is a text channel
@@ -54,7 +54,7 @@ module.exports = {
                 serverName: interaction.guild.name,
                 channelId: channel.id,
                 channelName: channel.name,
-                interval: interval * 60 * 1000, // Convert to milliseconds
+                interval: interval * 60 * 60 * 1000, // Convert hours to milliseconds
                 startedBy: interaction.user.id,
                 startedAt: new Date()
             };
@@ -75,14 +75,14 @@ module.exports = {
 
             console.log(`🔄 Recap started for ${interaction.guild.name}`);
             console.log(`📍 Channel: #${channel.name}`);
-            console.log(`⏰ Interval: ${interval} minutes`);
+            console.log(`⏰ Interval: ${interval} hours`);
             console.log(`👤 Started by: ${interaction.user.username}`);
 
             await interaction.reply({
                 content: `✅ **Recap started!**\n` +
                         `📍 Channel: ${channel}\n` +
-                        `⏰ Interval: **${interval} minutes**\n` +
-                        `🤖 I'll send automatic recaps of server activity every ${interval} minutes.`,
+                        `⏰ Interval: **${interval} hours**\n` +
+                        `🤖 I'll send automatic recaps of server activity every ${interval} hours.`,
                 ephemeral: false
             });
 

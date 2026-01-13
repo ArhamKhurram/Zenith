@@ -27,11 +27,11 @@ function buildFallback(messages) {
     const now = new Date();
     const timeString = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
 
-    return `**Trading Recap • ${timeString}**\n\n` +
-        `• **${messages.length}** messages across **${Object.keys(channelCounts).length}** channels\n` +
-        `• Most active: **#${topChannel}** (${channelCounts[topChannel] || 0} messages)\n` +
-        `• Top trader: **${topUser}** (${userCounts[topUser] || 0} messages)\n\n` +
-        `*AI recap temporarily unavailable - showing basic activity*`;
+    return `**🌟 Trading Recap • ${timeString}**\n\n` +
+        `**Summary:** ${messages.length} messages across **${Object.keys(channelCounts).length}** channels\n` +
+        `**Top Channel:** #${topChannel} (${channelCounts[topChannel] || 0} messages)\n` +
+        `**Top Trader:** **${topUser}** (${userCounts[topUser] || 0} messages)\n\n` +
+        `**Notes:** AI recap temporarily unavailable - showing basic activity`;
 }
 
 async function generateRecap(messages) {
@@ -48,50 +48,47 @@ async function generateRecap(messages) {
         ).join('\n');
 
         const prompt = `
-You are creating ultra-concise crypto trading recaps. Analyze these messages and create SHORT, actionable summaries with proper context.
+    You are creating ultra-concise crypto trading recaps. Analyze these messages and create SHORT, actionable summaries with proper context.
 
-Guidelines:
-- Keep each point under 30 words but include enough context to be useful
-- Focus on: token moves, prices, news, catalysts, contract addresses
-- No fancy formatting - just raw facts
-- Use crypto slang: "pump", "dump", "ATH", "2x", "3x", "rug", "moon", "degen"
-- Include token symbols like $TOKEN and contract addresses (CA: 0x...)
-- Be direct and actionable for traders
-- No fluff or narrative storytelling
-- Ignore non-trading discussions
-- Focus on what traders need to know NOW
-- ALWAYS include actual usernames from messages - use "rev", "Owari", "trinity" etc. instead of "trader" or "multiple traders"
-- When multiple people are involved, list their names: "rev, Owari, trinity agreed on $TOKEN long"
-- CONNECT related messages - if someone mentions a token and others respond, group them together
-- Provide CONTEXT for contract addresses - don't just say "watching CA", explain what token/play it is
-- If someone mentions top holders, whales, or specific details, include that context
+    Guidelines:
+    - Keep each point under 30 words but include enough context to be useful
+    - Focus on: token moves, prices, news, catalysts, contract addresses
+    - Use concise headings and bold keywords for clarity (Markdown bold is allowed)
+    - Use crypto slang: "pump", "dump", "ATH", "2x", "3x", "rug", "moon", "degen"
+    - Include token symbols like $TOKEN and contract addresses (CA: 0x...)
+    - Be direct and actionable for traders; avoid long narratives
+    - ALWAYS include actual usernames from messages - use real handles like "rev", "Owari", "trinity"
+    - When multiple people are involved, list their names: "rev, Owari, trinity agreed on $TOKEN long"
+    - CONNECT related messages - if someone mentions a token and others respond, group them together
+    - Provide CONTEXT for contract addresses - explain what token/play it is
 
-IMPORTANT - Contract Address Recognition:
-- Real contract addresses: 0x followed by 40 hex characters (0x1234abcd...)
-- NOT contract addresses: Long decimal numbers (these are Discord message IDs, ignore them)
-- Only mention CA if it's actual hex format starting with 0x
+    IMPORTANT - Contract Address Recognition:
+    - Real contract addresses: 0x followed by 40 hex characters (0x1234abcd...)
+    - NOT contract addresses: Long decimal numbers (these are Discord message IDs, ignore them)
+    - Only mention CA if it's actual hex format starting with 0x
 
-IMPORTANT - These are NOT tokens, they are trading terms:
-- "spot" = spot trading (not a token)
-- "long" = long position (not a token)  
-- "short" = short position (not a token)
-- "bag" = holding/position (not a token)
-- "fat" = large size (not a token)
-- "futures" = futures trading (not a token)
-- "perp" = perpetual contract (not a token)
+    IMPORTANT - These are NOT tokens, they are trading terms:
+    - "spot" = spot trading (not a token)
+    - "long" = long position (not a token)
+    - "short" = short position (not a token)
+    - "bag" = holding/position (not a token)
+    - "fat" = large size (not a token)
+    - "futures" = futures trading (not a token)
+    - "perp" = perpetual contract (not a token)
 
-Only treat something as a token if it has $ prefix ($TOKEN) or is explicitly mentioned with contract address.
+    Only treat something as a token if it has $ prefix ($TOKEN) or is explicitly mentioned with contract address.
 
-Messages to analyze:
-${messageText}
+    Messages to analyze:
+    ${messageText}
 
-Create 3-6 concise bullet points with proper context covering key trading opportunities, token moves, or market events. Each point should be actionable intel for traders with enough detail to understand the situation.
+    Create 3-6 concise lines with proper context covering key trading opportunities, token moves, or market events. Each line should be actionable intel for traders with enough detail to understand the situation.
 
-Format:
-• $TOKEN (CA: 0x123...) - [username] [action/context], [additional relevant details from related messages]
-• [username] mentioned [token/context] - [what it is, why it matters, any responses]
-• [Key market event with full context and usernames involved]
-`;
+    Format (use bold labels and a heading):
+    **Trading Recap • [TIME]**
+    - **Token:** $TOKEN (CA: 0x123...) — **User:** [username] [action/context], [additional relevant details]
+    - **Mention:** **User:** mentioned $TOKEN — [what it is, why it matters, any responses]
+    - **Event:** [Key market event with full context and usernames involved]
+    `;
 
         // If no API key is configured, immediately return the safe fallback
         if (!DEEPSEEK_KEY) {
@@ -101,10 +98,10 @@ Format:
 
         // Prepare DeepSeek request
         const endpoint = 'https://api.deepseek.com/chat/completions';
-        const payload = {
+            const payload = {
             model: process.env.DEEPSEEK_MODEL || 'deepseek-chat',
             messages: [
-                { role: 'system', content: 'Respond ONLY with final bullet points. Never include your reasoning, thinking process, or self-checks. Format strictly as:\n• Point 1\n• Point 2\n• Point 3' },
+                { role: 'system', content: 'Respond ONLY with the final recap using headings and bold keywords where appropriate. Never include your reasoning or internal checks. Format strictly starting with:\n**Trading Recap • [TIME]**\n- **Token:** ...\n- **Mention:** ...\n- **Event:** ...' },
                 { role: 'user', content: prompt }
             ],
             max_tokens: 1200,
@@ -246,13 +243,11 @@ Format:
             minute: '2-digit' 
         });
 
-        return `**Trading Recap • ${timeString}**
-
-• **${messages.length}** messages across **${Object.keys(channelCounts).length}** channels
-• Most active: **#${topChannel}** (${channelCounts[topChannel]} messages)
-• Top trader: **${topUser}** (${userCounts[topUser]} messages)
-
-*AI recap temporarily unavailable - showing basic activity*`;
+        return `**🌟 Trading Recap • ${timeString}**\n\n` +
+            `**Summary:** ${messages.length} messages across **${Object.keys(channelCounts).length}** channels\n` +
+            `**Top Channel:** #${topChannel} (${channelCounts[topChannel]} messages)\n` +
+            `**Top Trader:** **${topUser}** (${userCounts[topUser]} messages)\n\n` +
+            `**Notes:** AI recap temporarily unavailable - showing basic activity`;
     }
 }
 
