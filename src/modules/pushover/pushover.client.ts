@@ -80,10 +80,16 @@ export class PushoverClient {
 
       // Handle specific error codes
       if (response.status === 400) {
-        logger.warn('Pushover 400 - Invalid user key', {
+        let errorMsg = 'Invalid request';
+        try {
+          const err = await response.json();
+          errorMsg = err.errors?.[0]?.message || err.error || 'Invalid request';
+        } catch { /* ignore parse errors */ }
+        logger.warn('Pushover 400 - Bad request', {
           userKey: this.maskKey(userKey),
+          error: errorMsg,
         });
-        return { success: false, status: 400, error: 'Invalid user key' };
+        return { success: false, status: 400, error: errorMsg };
       }
 
       if (response.status === 429) {

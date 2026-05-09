@@ -26,7 +26,7 @@ interface AlertTypeConfig {
 }
 
 const ALERT_TYPES: Record<string, AlertTypeConfig> = {
-  silent: {
+  dd: {
     priority: -1,
     filterField: 'ddEnabled',
     typeLabel: 'DD (Silent)',
@@ -34,18 +34,25 @@ const ALERT_TYPES: Record<string, AlertTypeConfig> = {
   },
   bell: {
     priority: 1,
-    sound: 'pushover',
+    sound: 'cashregister',
     filterField: 'pingEnabled',
-    typeLabel: 'Ping (Bell)',
+    typeLabel: 'Bell (Ping)',
     typeEmoji: '🔔',
   },
-  critical: {
+  trench: {
+    priority: 1,
+    sound: 'pushover',
+    filterField: 'trenchEnabled',
+    typeLabel: 'Trench (Loud)',
+    typeEmoji: '📡',
+  },
+  nuke: {
     priority: 2,
     sound: 'siren',
     retry: 60,
     expire: 3600,
     filterField: 'nukeEnabled',
-    typeLabel: 'Nuke (Emergency)',
+    typeLabel: 'Nuke (Critical)',
     typeEmoji: '🚨',
   },
 };
@@ -77,117 +84,129 @@ export class PushoverService {
     };
   }
 
-  async broadcast(
-    guildId: string,
-    triggerUserId: string,
-    triggerUsername: string,
-    alertType: string,
-    message: string,
-  ): Promise<BroadcastStats & { alertConfig: AlertTypeConfig; fallbackApplied?: boolean }> {
-    const config = this.getAlertType(alertType);
-    const shouldReceive = this.buildFilter(alertType);
+   async broadcast(
+     guildId: string,
+     triggerUserId: string,
+     triggerUsername: string,
+     alertType: string,
+     message: string,
+   ): Promise<BroadcastStats & { alertConfig: AlertTypeConfig; fallbackApplied?: boolean }> {
+     const config = this.getAlertType(alertType);
+     const shouldReceive = this.buildFilter(alertType);
 
-    // Get all users with their settings
-    const registrations = await this.userRepository.findAll();
-    const usersWithSettings: Array<{
-      registration: UserRegistration;
-      settings: UserSettings | null;
-    }> = [];
+     // Get all users with their settings
+     const registrations = await this.userRepository.findAll();
+     const usersWithSettings: Array<{
+       registration: UserRegistration;
+       settings: UserSettings | null;
+     }> = [];
 
-    for (const reg of registrations) {
-      const settings = await this.userRepository.getSettings(reg.id);
-      usersWithSettings.push({ registration: reg, settings });
-    }
+     for (const reg of registrations) {
+       const settings = await this.userRepository.getSettings(reg.id);
+       usersWithSettings.push({ registration: reg, settings });
+     }
 
-    // Filter eligible users
-    const eligibleUsers = usersWithSettings.filter(({ settings }) => {
-      if (!settings) return false;
-      const filterField = config.filterField;
-      // For critical alerts, accept users with nukeEnabled OR any alert preference enabled
-      // as fallback when no nuke-enabled users exist
-      if (filterField === 'nukeEnabled') {
-        if (settings.broadcastAlertsEnabled && settings.nukeEnabled) return true;
-        return false;
-      }
-      return shouldReceive(settings);
-    });
+     // Filter eligible users
+     const eligibleUsers = usersWithSettings.filter(({ settings }) => {
+       if (!settings) return false;
+       const filterField = config.filterField;
+       if (filterField === 'nukeEnabled') {
+         if (settings.broadcastAlertsEnabled && settings.nukeEnabled) return true;
+         return false;
+       }
+       return shouldReceive(settings);
+     });
 
-    // Fallback for critical alerts: if no nuke-enabled users found, include users
-    // with any other alert type enabled (bell or dd)
-    let fallbackApplied = false;
-    if (alertType === 'critical' && eligibleUsers.length === 0) {
-      const fallbackUsers = usersWithSettings.filter(({ settings }) => {
-        if (!settings || !settings.broadcastAlertsEnabled) return false;
-        return settings.pingEnabled || settings.ddEnabled || settings.trenchEnabled;
-      });
-      if (fallbackUsers.length > 0) {
-        fallbackApplied = true;
-        logger.warn('Critical alert fallback activated', {
-          guildId,
-          reason: 'No users with nukeEnabled found, falling back to users with bell/dd/trench settings',
-          fallbackCount: fallbackUsers.length,
-        });
-        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-        eligibleUsers.push(...fallbackUsers);
-      }
-    }
+     // Fallback for nuke alerts: if no nuke-enabled users found, include users
+     // with any other alert type enabled (bell/dd/trench)
+     let fallbackApplied = false;
+     if (alertType === 'nuke' && eligibleUsers.length === 0) {
+       const fallbackUsers = usersWithSettings.filter(({ settings }) => {
+         if (!settings || !settings.broadcastAlertsEnabled) return false;
+         return settings.pingEnabled || settings.ddEnabled || settings.trenchEnabled;
+       });
+       if (fallbackUsers.length > 0) {
+         fallbackApplied = true;
+         logger.warn('Critical alert fallback activated', {
+           guildId,
+           reason: 'No users with nukeEnabled found, falling back to users with bell/dd/trench settings',
+           fallbackCount: fallbackUsers.length,
+         });
+         eligibleUsers.push(...fallbackUsers);
+       }
+     }
 
-    logger.info('Broadcasting alert', {
-      guildId,
-      alertType,
-      eligibleCount: eligibleUsers.length,
-      totalRegistered: registrations.length,
-      fallbackApplied,
-    });
+     logger.info('Broadcasting alert', {
+       guildId,
+       alertType,
+       eligibleCount: eligibleUsers.length,
+       totalRegistered: registrations.length,
+       fallbackApplied,
+     });
 
-    // Send notifications in batches
-    let successCount = 0;
-    let failureCount = 0;
-    const notifiedUserIds: string[] = [];
+     // Send notifications in batches
+     let successCount = 0;
+     let failureCount = 0;
+     const notifiedUserIds: string[] = [];
 
-    const batchSize = 10;
-    const delayBetweenBatches = 100;
+     const batchSize = 10;
+     const delayBetweenBatches = 100;
 
-    for (let i = 0; i < eligibleUsers.length; i += batchSize) {
-      const batch = eligibleUsers.slice(i, i + batchSize);
+     for (let i = 0; i < eligibleUsers.length; i += batchSize) {
+       const batch = eligibleUsers.slice(i, i + batchSize);
 
-      const results = await Promise.all(
-        batch.map(async ({ registration }) => {
-          try {
-            const decryptedKey = decryptPushoverKey(
-              registration.pushoverKeyEnc,
-              registration.encryptionIv,
-            );
-            const result = await this.pushoverClient.send(
-              decryptedKey,
-              message,
-              config.priority,
-              {
-                title: config.typeLabel,
-                sound: config.sound,
-                retry: config.retry,
-                expire: config.expire,
-              },
-            );
+        const results = await Promise.all(
+          batch.map(async ({ registration }) => {
+            try {
+              const decryptedKey = decryptPushoverKey(
+                registration.pushoverKeyEnc,
+                registration.encryptionIv,
+              );
 
-            return {
-              userId: registration.discordUserId,
-              success: result.success,
-              error: result.error,
-            };
-          } catch (error: any) {
-            logger.error('Broadcast send error', {
-              userId: registration.discordUserId,
-              error: error.message,
-            });
-            return {
-              userId: registration.discordUserId,
-              success: false,
-              error: error.message,
-            };
-          }
-        }),
-      );
+              // Validate decrypted key format (must be exactly 30 alphanumeric chars)
+              if (!/^[a-zA-Z0-9]{30}$/.test(decryptedKey)) {
+                logger.error('Invalid Pushover key format after decryption', {
+                  userId: registration.discordUserId,
+                  keyLength: decryptedKey.length,
+                  keyPreview: decryptedKey.slice(0, 10),
+                });
+                return {
+                  userId: registration.discordUserId,
+                  success: false,
+                  error: 'Invalid key format',
+                };
+              }
+
+              const result = await this.pushoverClient.send(
+                decryptedKey,
+                message,
+                config.priority,
+                {
+                  title: config.typeLabel,
+                  sound: config.sound,
+                  retry: config.retry,
+                  expire: config.expire,
+                },
+              );
+
+              return {
+                userId: registration.discordUserId,
+                success: result.success,
+                error: result.error,
+              };
+            } catch (error: any) {
+              logger.error('Broadcast send error', {
+                userId: registration.discordUserId,
+                error: error.message,
+              });
+              return {
+                userId: registration.discordUserId,
+                success: false,
+                error: error.message,
+              };
+            }
+          }),
+        );
 
       for (const result of results) {
         if (result.success) {

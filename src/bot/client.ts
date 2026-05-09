@@ -486,8 +486,8 @@ client.on('messageCreate', async (message) => {
 
     if (mentionedTierKeys.length === 0) return;
 
-    // Remove bot mentions from content for cleanliness
-    const cleanContent = message.content.replace(/<@!?\d+>/g, '').trim();
+    // Remove bot mentions and role mentions from content for cleanliness
+    const cleanContent = message.content.replace(/<@!?\d+>/g, '').replace(/<@&\d+>/g, '').trim();
 
     // Get the triggering user info
     const member = await message.guild!.members.fetch(message.author.id);
@@ -507,7 +507,7 @@ client.on('messageCreate', async (message) => {
         message.author.id,
         triggerUsername,
         tierKey,
-        `[${tierLabels[tierKey] || tierKey}] ${cleanContent}`,
+        cleanContent,
       );
 
       // React to the message to confirm delivery
