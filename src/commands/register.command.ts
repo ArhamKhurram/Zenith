@@ -48,7 +48,7 @@ async function handleAdd(
   interaction: ChatInputCommandInteraction,
   userService: UserService,
 ) {
-  const key = interaction.options.getString('key', true);
+  const key = interaction.options.getString('key');
 
   if (!key) {
     await interaction.reply({
