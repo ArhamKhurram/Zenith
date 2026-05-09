@@ -1,4 +1,4 @@
-import { Client, GatewayIntentBits, Collection, ActivityType, BaseInteraction } from 'discord.js';
+import { Client, GatewayIntentBits, Collection, ActivityType, TextInputBuilder, TextInputStyle, ActionRowBuilder, ModalBuilder, ButtonBuilder, ButtonStyle, StringSelectMenuBuilder, StringSelectMenuOptionBuilder } from 'discord.js';
 import { env } from '../config/env';
 import { logger } from '../utils/logger';
 
@@ -72,11 +72,25 @@ client.on('interactionCreate', async (interaction) => {
         }
         return;
       }
+      if (interaction.customId === 'admin:modal_roles') {
+        const prisma = (client as any).prisma;
+        const { GuildService } = await import('../modules/guilds/guild.service');
+        const guildService = new GuildService(prisma);
+
+        const roleIds = interaction.fields.getTextInputValue('admin:role_ids');
+        const guildId = interaction.guildId!;
+
+        const result = await guildService.setAdminRoles(guildId, roleIds, interaction.guild!.name);
+        await interaction.reply({ content: result.message, ephemeral: true });
+        return;
+      }
     } else if (interaction.isButton()) {
+      // Register remove cancel
       if (interaction.customId === 'register:cancel_remove') {
         await interaction.update({ content: 'Cancelled. Your key has not been removed.', components: [] });
         return;
       }
+      // Register remove confirm
       if (interaction.customId === 'register:confirm_remove') {
         const { UserService } = await import('../modules/users/user.service');
         const prisma = (client as any).prisma;
@@ -85,11 +99,59 @@ client.on('interactionCreate', async (interaction) => {
         await interaction.update({ content: result.message, components: [] });
         return;
       }
+      // Settings edit button -> show modal
       if (interaction.customId === 'settings:edit') {
         const settingsCmd = commands.get('settings');
         if (settingsCmd?.handleButton) {
           await settingsCmd.handleButton(interaction);
         }
+        return;
+      }
+      // Admin: Set History Channel button
+      if (interaction.customId === 'admin:set_history_channel') {
+        const prisma = (client as any).prisma;
+        const { GuildService } = await import('../modules/guilds/guild.service');
+        const guildService = new GuildService(prisma);
+
+        const channelId = interaction.channelId;
+        const result = await guildService.setAlertHistoryChannel(
+          interaction.guildId!,
+          channelId,
+          interaction.guild!.name,
+        );
+
+        await interaction.update({
+          content: result.success
+            ? `✅ History channel set to <#${channelId}>.`
+            : `❌ ${result.message}`,
+          components: [],
+        });
+        return;
+      }
+      // Admin: Manage Admin Roles button -> show modal
+      if (interaction.customId === 'admin:set_admin_roles') {
+        const { ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder } = await import('discord.js');
+        const prisma = (client as any).prisma;
+        const { GuildService } = await import('../modules/guilds/guild.service');
+        const guildService = new GuildService(prisma);
+
+        const config = await guildService.getOrCreateGuildConfig(interaction.guildId!, interaction.guild!.name);
+        const currentRoles = config.adminRoleIds || '';
+
+        const modal = new ModalBuilder()
+          .setCustomId('admin:modal_roles')
+          .setTitle('Manage Admin Roles');
+
+        const roleInput = new TextInputBuilder()
+          .setCustomId('admin:role_ids')
+          .setLabel('Role IDs (comma-separated)')
+          .setStyle(TextInputStyle.Paragraph)
+          .setPlaceholder('e.g. 123456789,987654321')
+          .setValue(currentRoles)
+          .setRequired(false);
+
+        modal.addComponents(new ActionRowBuilder().addComponents(roleInput) as any);
+        await interaction.showModal(modal);
         return;
       }
     }

@@ -127,7 +127,8 @@ export class PushoverClient {
         message: 'Test',
         priority: -2,
       });
-      return response.ok;
+      // Any response (even 400) means the API is reachable
+      return response.ok || response.status === 400;
     } catch {
       return false;
     }

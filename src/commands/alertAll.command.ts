@@ -44,8 +44,8 @@ export async function execute(interaction: ChatInputCommandInteraction) {
 }
 
 async function handleAlertAll(interaction: ChatInputCommandInteraction) {
-  const alertType = interaction.options.getString('type', true);
-  const message = interaction.options.getString('message', true);
+  const alertType = interaction.options.getString('type');
+  const message = interaction.options.getString('message');
 
   if (!alertType || !message) {
     await interaction.reply({
