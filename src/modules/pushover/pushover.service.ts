@@ -101,12 +101,26 @@ export class PushoverService {
        settings: UserSettings | null;
      }> = [];
 
-     for (const reg of registrations) {
-       const settings = await this.userRepository.getSettings(reg.id);
-       usersWithSettings.push({ registration: reg, settings });
-     }
+      for (const reg of registrations) {
+        const settings = await this.userRepository.getSettings(reg.id);
+        usersWithSettings.push({ registration: reg, settings });
+      }
 
-     // Filter eligible users
+      // Auto-create missing UserSettings with defaults for any user without settings
+      for (const entry of usersWithSettings) {
+        if (!entry.settings) {
+          entry.settings = await this.prisma.userSettings.upsert({
+            where: { userId: entry.registration.id },
+            update: {},
+            create: { userId: entry.registration.id },
+          });
+          logger.info('Created missing user settings during broadcast', {
+            userId: entry.registration.id,
+          });
+        }
+      }
+
+      // Filter eligible users
      const eligibleUsers = usersWithSettings.filter(({ settings }) => {
        if (!settings) return false;
        const filterField = config.filterField;

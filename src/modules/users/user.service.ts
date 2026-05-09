@@ -49,7 +49,13 @@ export class UserService {
       const maskedKey = maskPushoverKey(rawKey);
 
       // Upsert the user registration
-      await this.repository.upsert(discordUserId, discordUsername, encrypted, iv);
+      const registration = await this.repository.upsert(discordUserId, discordUsername, encrypted, iv);
+      // Ensure default settings are created for new registrations
+      await this.prisma.userSettings.upsert({
+        where: { userId: registration.id },
+        update: {},
+        create: { userId: registration.id },
+      });
 
       logger.info('User registered', {
         userId: discordUserId,

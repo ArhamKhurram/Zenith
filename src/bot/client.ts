@@ -10,6 +10,7 @@ import {
   ButtonBuilder,
   ButtonStyle,
   EmbedBuilder,
+  MessageFlags,
 } from 'discord.js';
 import { env } from '../config/env';
 import { logger } from '../utils/logger';
@@ -82,7 +83,7 @@ client.on('interactionCreate', async (interaction) => {
       const command = commands.get(interaction.commandName);
       if (!command) {
         logger.warn('Unknown command invoked', { commandName: interaction.commandName });
-        await interaction.reply({ content: 'Unknown command.', ephemeral: true });
+        await interaction.reply({ content: 'Unknown command.', flags: [MessageFlags.Ephemeral] });
         return;
       }
       await command.execute(interaction as any);
@@ -105,11 +106,12 @@ client.on('interactionCreate', async (interaction) => {
         const guildId = interaction.guildId!;
 
         const result = await guildService.setAdminRoles(guildId, roleIds, interaction.guild!.name);
-        await interaction.reply({ content: result.message, ephemeral: true });
+        await interaction.reply({ content: result.message, flags: [MessageFlags.Ephemeral] });
         return;
       }
       // Admin: Modal submission for tier role assignment
       if (interaction.customId.startsWith('admin:modal_tier_')) {
+        await interaction.deferUpdate();
         const prisma = (client as any).prisma;
          const { GuildService } = await import('../modules/guilds/guild.service');
         const guildService = new GuildService(prisma);
@@ -148,15 +150,15 @@ client.on('interactionCreate', async (interaction) => {
           nuke: 'Nuke (Critical)',
         };
 
-        await interaction.reply({
-          content: result.success
-            ? `✅ ${tierLabels[tierKey] || tierKey} role ${roleId ? 'set' : 'cleared'}.`
-            : `❌ ${result.message}`,
-          ephemeral: true,
-        });
-        return;
-      }
-    } else if (interaction.isButton()) {
+         await interaction.followUp({
+           content: result.success
+             ? `✅ ${tierLabels[tierKey] || tierKey} role ${roleId ? 'set' : 'cleared'}.`
+             : `❌ ${result.message}`,
+           flags: [MessageFlags.Ephemeral],
+         });
+         return;
+       }
+     } else if (interaction.isButton()) {
       // Register remove cancel
       if (interaction.customId === 'register:cancel_remove') {
         await interaction.update({ content: 'Cancelled. Your key has not been removed.', components: [] });
@@ -181,6 +183,7 @@ client.on('interactionCreate', async (interaction) => {
       }
       // Admin: Set History Channel button
       if (interaction.customId === 'admin:set_history_channel') {
+        await interaction.deferUpdate();
         const prisma = (client as any).prisma;
          const { GuildService } = await import('../modules/guilds/guild.service');
         const guildService = new GuildService(prisma);
@@ -192,7 +195,7 @@ client.on('interactionCreate', async (interaction) => {
           interaction.guild!.name,
         );
 
-        await interaction.update({
+        await interaction.editReply({
           content: result.success
             ? `✅ History channel set to <#${channelId}>.`
             : `❌ ${result.message}`,
@@ -276,6 +279,7 @@ client.on('interactionCreate', async (interaction) => {
       }
       // Admin: Modal submission for tier role assignment
       if (interaction.customId.startsWith('admin:modal_tier_')) {
+        await interaction.deferUpdate();
         const prisma = (client as any).prisma;
          const { GuildService } = await import('../modules/guilds/guild.service');
         const guildService = new GuildService(prisma);
@@ -314,16 +318,17 @@ client.on('interactionCreate', async (interaction) => {
           nuke: 'Nuke (Critical)',
         };
 
-        await interaction.reply({
-          content: result.success
-            ? `✅ ${tierLabels[tierKey] || tierKey} role ${roleId ? 'set' : 'cleared'}.`
-            : `❌ ${result.message}`,
-          ephemeral: true,
-        });
-        return;
-      }
-      // Setup: Toggle buttons for role-based alert preferences
+         await interaction.followUp({
+           content: result.success
+             ? `✅ ${tierLabels[tierKey] || tierKey} role ${roleId ? 'set' : 'cleared'}.`
+             : `❌ ${result.message}`,
+           flags: [MessageFlags.Ephemeral],
+         });
+         return;
+       }
+       // Setup: Toggle buttons for role-based alert preferences
       if (interaction.customId.startsWith('setup:toggle_')) {
+        await interaction.deferUpdate();
         const prisma = (client as any).prisma;
          const { GuildService } = await import('../modules/guilds/guild.service');
         const { UserService } = await import('../modules/users/user.service');
@@ -334,7 +339,7 @@ client.on('interactionCreate', async (interaction) => {
         const tierInfo = TIER_MAPPING[tierKey];
 
         if (!tierInfo) {
-          await interaction.reply({ content: '❌ Unknown tier.', ephemeral: true });
+          await interaction.followUp({ content: '❌ Unknown tier.', flags: [MessageFlags.Ephemeral] });
           return;
         }
 
@@ -356,21 +361,21 @@ client.on('interactionCreate', async (interaction) => {
 
         const roleIdForTier = tierRoles[tierKey];
 
-        // Check if the tier role is configured
-        if (!roleIdForTier) {
-          await interaction.reply({
-            content: `❌ No Discord role is assigned for ${tierInfo.label}. Ask an admin to set it up with \`/admin config\`.`,
-            ephemeral: true,
-          });
-          return;
-        }
+         // Check if the tier role is configured
+         if (!roleIdForTier) {
+           await interaction.followUp({
+             content: `❌ No Discord role is assigned for ${tierInfo.label}. Ask an admin to set it up with \`/admin config\`.`,
+             flags: [MessageFlags.Ephemeral],
+           });
+           return;
+         }
 
         // Get the guild member to check roles
         const member = await interaction.guild?.members.fetch(userId);
-        if (!member) {
-          await interaction.reply({ content: '❌ Could not fetch your profile.', ephemeral: true });
-          return;
-        }
+         if (!member) {
+           await interaction.followUp({ content: '❌ Could not fetch your profile.', flags: [MessageFlags.Ephemeral] });
+           return;
+         }
 
         // Check if the user currently has the role
         const hasRole = member.roles.cache.has(roleIdForTier);
@@ -384,10 +389,10 @@ client.on('interactionCreate', async (interaction) => {
 
         const result = await userService.updateSettings(userId, update);
 
-        if (!result.success) {
-          await interaction.reply({ content: result.message, ephemeral: true });
-          return;
-        }
+         if (!result.success) {
+           await interaction.followUp({ content: result.message, flags: [MessageFlags.Ephemeral] });
+           return;
+         }
 
         // Assign/remove the Discord role
         if (newState) {
@@ -428,24 +433,24 @@ client.on('interactionCreate', async (interaction) => {
           )
           .setFooter({ text: `Click the buttons below to toggle roles | ${tierInfo.label} ${newState ? 'enabled' : 'disabled'}` });
 
-        await interaction.update({ embeds: [embed], components: [setupRow] });
+        await interaction.editReply({ embeds: [embed], components: [setupRow] });
         return;
       }
     }
-  } catch (error: any) {
-    logger.error('Error handling interaction', { error: error.message, stack: error.stack });
-    const msg = error.isOperational ? error.message : 'An unexpected error occurred.';
-    try {
-      const inter = interaction as any;
-      if (inter.replied || inter.deferred) {
-        await inter.followUp({ content: msg, ephemeral: true });
-      } else {
-        await inter.reply({ content: msg, ephemeral: true });
-      }
-    } catch (e: any) {
-      logger.error('Failed to send error reply', { error: e.message });
-    }
-  }
+   } catch (error: any) {
+     logger.error('Error handling interaction', { error: error.message, stack: error.stack });
+     const msg = error.isOperational ? error.message : 'An unexpected error occurred.';
+     try {
+       const inter = interaction as any;
+       if (inter.replied || inter.deferred) {
+         await inter.followUp({ content: msg, flags: [MessageFlags.Ephemeral] });
+       } else {
+         await inter.reply({ content: msg, flags: [MessageFlags.Ephemeral] });
+       }
+     } catch (e: any) {
+       logger.error('Failed to send error reply', { error: e.message });
+     }
+   }
 });
 
 client.on('messageCreate', async (message) => {
