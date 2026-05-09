@@ -98,7 +98,7 @@ client.on('interactionCreate', async (interaction) => {
       // Admin: Manage Admin Roles modal
       if (interaction.customId === 'admin:modal_roles') {
         const prisma = (client as any).prisma;
-        const { GuildService } = await import('../modules/guilds/guild.service');
+         const { GuildService } = await import('../modules/guilds/guild.service');
         const guildService = new GuildService(prisma);
 
         const roleIds = interaction.fields.getTextInputValue('admin:role_ids');
@@ -111,7 +111,7 @@ client.on('interactionCreate', async (interaction) => {
       // Admin: Modal submission for tier role assignment
       if (interaction.customId.startsWith('admin:modal_tier_')) {
         const prisma = (client as any).prisma;
-        const { GuildService } = await import('../modules/guilds/guild.service');
+         const { GuildService } = await import('../modules/guilds/guild.service');
         const guildService = new GuildService(prisma);
 
         const tierKey = interaction.customId.replace('admin:modal_tier_', '');
@@ -182,7 +182,7 @@ client.on('interactionCreate', async (interaction) => {
       // Admin: Set History Channel button
       if (interaction.customId === 'admin:set_history_channel') {
         const prisma = (client as any).prisma;
-        const { GuildService } = await import('../modules/guilds/guild.service');
+         const { GuildService } = await import('../modules/guilds/guild.service');
         const guildService = new GuildService(prisma);
 
         const channelId = interaction.channelId;
@@ -204,7 +204,7 @@ client.on('interactionCreate', async (interaction) => {
       if (interaction.customId === 'admin:set_admin_roles') {
         const { ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder } = await import('discord.js');
         const prisma = (client as any).prisma;
-        const { GuildService } = await import('../modules/guilds/guild.service');
+         const { GuildService } = await import('../modules/guilds/guild.service');
         const guildService = new GuildService(prisma);
 
         const config = await guildService.getOrCreateGuildConfig(interaction.guildId!, interaction.guild!.name);
@@ -234,7 +234,7 @@ client.on('interactionCreate', async (interaction) => {
       ) {
         const { ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder } = await import('discord.js');
         const prisma = (client as any).prisma;
-        const { GuildService } = await import('../modules/guilds/guild.service');
+         const { GuildService } = await import('../modules/guilds/guild.service');
         const guildService = new GuildService(prisma);
 
         const config = await guildService.getOrCreateGuildConfig(interaction.guildId!, interaction.guild!.name);
@@ -277,7 +277,7 @@ client.on('interactionCreate', async (interaction) => {
       // Admin: Modal submission for tier role assignment
       if (interaction.customId.startsWith('admin:modal_tier_')) {
         const prisma = (client as any).prisma;
-        const { GuildService } = await import('../modules/guilds/guild.service');
+         const { GuildService } = await import('../modules/guilds/guild.service');
         const guildService = new GuildService(prisma);
 
         const tierKey = interaction.customId.replace('admin:modal_tier_', '');
@@ -325,7 +325,7 @@ client.on('interactionCreate', async (interaction) => {
       // Setup: Toggle buttons for role-based alert preferences
       if (interaction.customId.startsWith('setup:toggle_')) {
         const prisma = (client as any).prisma;
-        const { GuildService } = await import('../modules/guilds/guild.service');
+         const { GuildService } = await import('../modules/guilds/guild.service');
         const { UserService } = await import('../modules/users/user.service');
         const guildService = new GuildService(prisma);
         const userService = new UserService(prisma);
@@ -455,8 +455,8 @@ client.on('messageCreate', async (message) => {
 
   try {
     const prisma = (client as any).prisma;
-    const { PushoverService } = await import('../modules/pushover/pushover.service');
-    const { GuildService } = await import('../modules/guilds/guild.service');
+      const { PushoverService } = await import('../modules/pushover/pushover.service');
+      const { GuildService } = await import('../modules/guilds/guild.service');
 
     const pushoverService = new PushoverService(prisma);
     const guildService = new GuildService(prisma);

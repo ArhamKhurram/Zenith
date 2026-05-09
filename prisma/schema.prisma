@@ -1,6 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -10,87 +7,61 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// Stores encrypted Pushover user keys
 model UserRegistration {
-  id                String   @id @default(uuid())
-  discordUserId     String   @unique
-  discordUsername   String
-  pushoverKeyEnc    String   // AES-256-GCM encrypted
-  encryptionIv      String   // Unique IV per record
-  registeredAt      DateTime @default(now())
-  updatedAt         DateTime @updatedAt
-
-  settings UserSettings?
+  id              String        @id @default(uuid())
+  discordUserId   String        @unique
+  discordUsername String
+  pushoverKeyEnc  String
+  encryptionIv    String
+  registeredAt    DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  settings        UserSettings?
 
   @@index([discordUserId])
 }
 
-// User notification preferences
 model UserSettings {
-  id                        String   @id @default(uuid())
-  userId                    String   @unique
-  user                      UserRegistration @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  // Alert type toggles
-  ddEnabled                 Boolean  @default(true)
-  pingEnabled               Boolean  @default(true)
-  trenchEnabled             Boolean  @default(true)
-  nukeEnabled               Boolean  @default(false) // Conservative default
-
-  // Global toggle
-  broadcastAlertsEnabled    Boolean  @default(true)
-
-  createdAt                 DateTime @default(now())
-  updatedAt                 DateTime @updatedAt
+  id                     String           @id @default(uuid())
+  userId                 String           @unique
+  ddEnabled              Boolean          @default(true)
+  pingEnabled            Boolean          @default(true)
+  trenchEnabled          Boolean          @default(true)
+  nukeEnabled            Boolean          @default(false)
+  broadcastAlertsEnabled Boolean          @default(true)
+  createdAt              DateTime         @default(now())
+  updatedAt              DateTime         @updatedAt
+  user                   UserRegistration @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
 }
 
-// Guild-specific configuration
 model GuildConfig {
   id                    String   @id @default(uuid())
   guildId               String   @unique
   guildName             String
-
-  // Channel where alert history is logged
   alertHistoryChannelId String?
-
-  // Role IDs that can broadcast alerts (comma-separated)
   adminRoleIds          String?
-
-  // Per-tier role IDs for alert-type specific permissions (JSON: { dd: "roleId", bell: "roleId", trench: "roleId", nuke: "roleId" })
-  tierRoleIds           String?  @db.Text
-
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
+  tierRoleIds           String?
 
   @@index([guildId])
 }
 
-// Audit log for all broadcasts
 model AlertAuditLog {
-  id                String   @id @default(uuid())
-  guildId           String
-
-  // Who sent it
-  triggerUserId     String
-  triggerUsername   String
-
-  // What was sent
-  alertType         String   // "silent" | "bell" | "critical"
-  messageText       String
-
-  // Results
-  attemptedCount    Int
-  successCount      Int
-  failureCount      Int
-
-  // Discord context
-  sourceMessageId   String?
-  sourceChannelId   String?
-  historyMessageId  String?  // ID of the embed in history channel
-
-  createdAt         DateTime @default(now())
+  id               String   @id @default(uuid())
+  guildId          String
+  triggerUserId    String
+  triggerUsername  String
+  alertType        String
+  messageText      String
+  attemptedCount   Int
+  successCount     Int
+  failureCount     Int
+  sourceMessageId  String?
+  sourceChannelId  String?
+  historyMessageId String?
+  createdAt        DateTime @default(now())
 
   @@index([guildId, createdAt])
 }
