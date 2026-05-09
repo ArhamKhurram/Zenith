@@ -2,7 +2,7 @@ import { PrismaClient } from '@prisma/client';
 import { PushoverClient } from './pushover.client';
 import { UserRepository } from '../users/user.repository';
 import { logger } from '../../utils/logger';
-import { maskPushoverKey, decryptPushoverKey } from '../users/encryption.util';
+import { decryptPushoverKey } from '../users/encryption.util';
 import type { UserRegistration, UserSettings } from '@prisma/client';
 
 interface BroadcastStats {
@@ -10,19 +10,6 @@ interface BroadcastStats {
   successCount: number;
   failureCount: number;
   notifiedUserIds?: string[];
-}
-
-interface AlertTypeConfig {
-  priority: number;
-  sound?: string;
-  retry?: number;
-  expire?: number;
-  filterField: keyof Pick<
-    UserSettings,
-    'ddEnabled' | 'pingEnabled' | 'trenchEnabled' | 'nukeEnabled'
-  >;
-  typeLabel: string;
-  typeEmoji: string;
 }
 
 interface AlertTypeConfig {
@@ -74,9 +61,6 @@ export class PushoverService {
     this.userRepository = new UserRepository(prisma);
   }
 
-  /**
-   * Determines the alert type config and filter settings for a given alert type string.
-   */
   private getAlertType(alertType: string): AlertTypeConfig {
     const config = ALERT_TYPES[alertType];
     if (!config) {
@@ -85,30 +69,14 @@ export class PushoverService {
     return config;
   }
 
-  /**
-   * Builds a filter function to determine which users should receive an alert
-   * based on their settings and the alert type.
-   */
   private buildFilter(alertType: string): ((settings: UserSettings) => boolean) {
     const config = this.getAlertType(alertType);
-
     return (settings: UserSettings): boolean => {
-      // Must have broadcast alerts enabled globally
       if (!settings.broadcastAlertsEnabled) return false;
-      // Must have the specific alert type enabled
       return settings[config.filterField] === true;
     };
   }
 
-  /**
-   * Broadcasts an alert to all eligible users in parallel with concurrency limiting.
-   * @param guildId The Discord guild ID
-   * @param triggerUserId The user ID who triggered the alert
-   * @param triggerUsername The username of the user who triggered the alert
-   * @param alertType The type of alert: 'silent' | 'bell' | 'critical'
-   * @param message The alert message text
-   * @returns Broadcast results
-   */
   async broadcast(
     guildId: string,
     triggerUserId: string,
@@ -131,84 +99,85 @@ export class PushoverService {
       usersWithSettings.push({ registration: reg, settings });
     }
 
-// Filter eligible users
-  const eligibleUsers = usersWithSettings.filter(({ settings }) => {
-    if (!settings) return false;
-    return shouldReceive(settings);
-  });
+    // Filter eligible users
+    const eligibleUsers = usersWithSettings.filter(({ settings }) => {
+      if (!settings) return false;
+      return shouldReceive(settings);
+    });
 
-  logger.info('Broadcasting alert', {
-    guildId,
-    alertType,
-    eligibleCount: eligibleUsers.length,
-    totalRegistered: registrations.length,
-  });
+    logger.info('Broadcasting alert', {
+      guildId,
+      alertType,
+      eligibleCount: eligibleUsers.length,
+      totalRegistered: registrations.length,
+    });
 
-  // Send notifications in parallel with concurrency control
-  let successCount = 0;
-  let failureCount = 0;
-  const notifiedUserIds: string[] = [];
+    // Send notifications in batches
+    let successCount = 0;
+    let failureCount = 0;
+    const notifiedUserIds: string[] = [];
 
-  // Process in batches to control concurrency
-  const batchSize = 10;
-  const delayBetweenBatches = 100;
+    const batchSize = 10;
+    const delayBetweenBatches = 100;
 
-  for (let i = 0; i < eligibleUsers.length; i += batchSize) {
-    const batch = eligibleUsers.slice(i, i + batchSize);
+    for (let i = 0; i < eligibleUsers.length; i += batchSize) {
+      const batch = eligibleUsers.slice(i, i + batchSize);
 
-    const results = await Promise.all(
-      batch.map(async ({ registration, settings }) => {
-        try {
-          const decryptedKey = decryptPushoverKey(registration.pushoverKeyEnc, registration.encryptionIv);
-          const result = await this.pushoverClient.send(
-            decryptedKey,
-            message,
-            config.priority,
-            {
-              title: config.typeLabel,
-              sound: config.sound,
-              retry: config.retry,
-              expire: config.expire,
-            },
-          );
+      const results = await Promise.all(
+        batch.map(async ({ registration }) => {
+          try {
+            const decryptedKey = decryptPushoverKey(
+              registration.pushoverKeyEnc,
+              registration.encryptionIv,
+            );
+            const result = await this.pushoverClient.send(
+              decryptedKey,
+              message,
+              config.priority,
+              {
+                title: config.typeLabel,
+                sound: config.sound,
+                retry: config.retry,
+                expire: config.expire,
+              },
+            );
 
-          return {
-            userId: registration.discordUserId,
-            success: result.success,
+            return {
+              userId: registration.discordUserId,
+              success: result.success,
+              error: result.error,
+            };
+          } catch (error: any) {
+            logger.error('Broadcast send error', {
+              userId: registration.discordUserId,
+              error: error.message,
+            });
+            return {
+              userId: registration.discordUserId,
+              success: false,
+              error: error.message,
+            };
+          }
+        }),
+      );
+
+      for (const result of results) {
+        if (result.success) {
+          successCount++;
+          notifiedUserIds.push(result.userId);
+        } else {
+          failureCount++;
+          logger.warn('Failed to notify user', {
+            userId: result.userId,
             error: result.error,
-          };
-        } catch (error: any) {
-          logger.error('Broadcast send error', {
-            userId: registration.discordUserId,
-            error: error.message,
           });
-          return {
-            userId: registration.discordUserId,
-            success: false,
-            error: error.message,
-          };
         }
-      }),
-    );
+      }
 
-    for (const result of results) {
-      if (result.success) {
-        successCount++;
-        notifiedUserIds.push(result.userId);
-      } else {
-        failureCount++;
-        logger.warn('Failed to notify user', {
-          userId: result.userId,
-          error: result.error,
-        });
+      if (i + batchSize < eligibleUsers.length) {
+        await new Promise((resolve) => setTimeout(resolve, delayBetweenBatches));
       }
     }
-
-    // Delay between batches (except for the last one)
-    if (i + batchSize < eligibleUsers.length) {
-      await new Promise((resolve) => setTimeout(resolve, delayBetweenBatches));
-    }
-  }
 
     const attemptedCount = successCount + failureCount;
 
@@ -227,9 +196,5 @@ export class PushoverService {
       notifiedUserIds,
       alertConfig: config,
     };
-  }
-
-  private decryptKey(registration: UserRegistration): string {
-    return decryptPushoverKey(registration.pushoverKeyEnc, registration.encryptionIv);
   }
 }
