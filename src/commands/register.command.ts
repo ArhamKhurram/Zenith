@@ -36,15 +36,22 @@ export async function execute(interaction: ChatInputCommandInteraction) {
 
   if (subcommand === 'add') {
     const key = interaction.options.getString('pushover_key') || '';
+
+    // Defer immediately to prevent interaction timeout
+    await interaction.deferReply({ ephemeral: true });
+
     const result = await userService.registerUser(
       interaction.user.id,
       interaction.user.username,
       key,
     );
-    await interaction.reply({ content: result.message, ephemeral: true });
+    await interaction.editReply({ content: result.message });
   } else if (subcommand === 'list') {
+    // Defer immediately to prevent interaction timeout
+    await interaction.deferReply({ ephemeral: true });
+
     const result = await userService.getRegistrationStatus(interaction.user.id);
-    await interaction.reply({ content: result.message, ephemeral: true });
+    await interaction.editReply({ content: result.message });
   } else if (subcommand === 'remove') {
     const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
       new ButtonBuilder()
