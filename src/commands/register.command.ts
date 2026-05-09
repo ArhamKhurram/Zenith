@@ -31,7 +31,8 @@ export const data = new SlashCommandBuilder()
 
 export async function execute(interaction: ChatInputCommandInteraction) {
   const subcommand = interaction.options.getSubcommand();
-  const userService = new UserService(interaction.client as any);
+  const prisma = (interaction.client as any).prisma;
+  const userService = new UserService(prisma);
 
   if (subcommand === 'add') {
     const key = interaction.options.getString('pushover_key') || '';
