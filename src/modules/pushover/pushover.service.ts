@@ -83,7 +83,7 @@ export class PushoverService {
     triggerUsername: string,
     alertType: string,
     message: string,
-  ): Promise<BroadcastStats & { alertConfig: AlertTypeConfig }> {
+  ): Promise<BroadcastStats & { alertConfig: AlertTypeConfig; fallbackApplied?: boolean }> {
     const config = this.getAlertType(alertType);
     const shouldReceive = this.buildFilter(alertType);
 
@@ -102,14 +102,42 @@ export class PushoverService {
     // Filter eligible users
     const eligibleUsers = usersWithSettings.filter(({ settings }) => {
       if (!settings) return false;
+      const filterField = config.filterField;
+      // For critical alerts, accept users with nukeEnabled OR any alert preference enabled
+      // as fallback when no nuke-enabled users exist
+      if (filterField === 'nukeEnabled') {
+        if (settings.broadcastAlertsEnabled && settings.nukeEnabled) return true;
+        return false;
+      }
       return shouldReceive(settings);
     });
+
+    // Fallback for critical alerts: if no nuke-enabled users found, include users
+    // with any other alert type enabled (bell or dd)
+    let fallbackApplied = false;
+    if (alertType === 'critical' && eligibleUsers.length === 0) {
+      const fallbackUsers = usersWithSettings.filter(({ settings }) => {
+        if (!settings || !settings.broadcastAlertsEnabled) return false;
+        return settings.pingEnabled || settings.ddEnabled || settings.trenchEnabled;
+      });
+      if (fallbackUsers.length > 0) {
+        fallbackApplied = true;
+        logger.warn('Critical alert fallback activated', {
+          guildId,
+          reason: 'No users with nukeEnabled found, falling back to users with bell/dd/trench settings',
+          fallbackCount: fallbackUsers.length,
+        });
+        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+        eligibleUsers.push(...fallbackUsers);
+      }
+    }
 
     logger.info('Broadcasting alert', {
       guildId,
       alertType,
       eligibleCount: eligibleUsers.length,
       totalRegistered: registrations.length,
+      fallbackApplied,
     });
 
     // Send notifications in batches
@@ -195,6 +223,7 @@ export class PushoverService {
       failureCount,
       notifiedUserIds,
       alertConfig: config,
+      fallbackApplied,
     };
   }
 }

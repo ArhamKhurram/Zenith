@@ -215,4 +215,47 @@ describe('Broadcast Flow', () => {
     const result = await pushoverService.broadcast('guild1', 'admin1', 'Admin', 'critical', 'Critical test');
     expect(result.attemptedCount).toBe(1);
   });
+
+  test('critical alert uses fallback when no nukeEnabled users exist', async () => {
+    const { PushoverService } = require('../../src/modules/pushover/pushover.service');
+    const pushoverService = new PushoverService(prisma);
+
+    // Users with bell and dd enabled but NOT nuke
+    await createUser('user_bell1', {
+      pushoverKey: 'uB123456789012345678901234BELL',
+      ddEnabled: false,
+      pingEnabled: true,
+      nukeEnabled: false,
+    });
+    await createUser('user_dd1', {
+      pushoverKey: 'uD123456789012345678901234DDYY',
+      ddEnabled: true,
+      pingEnabled: false,
+      nukeEnabled: false,
+    });
+
+    const result = await pushoverService.broadcast('guild1', 'admin1', 'Admin', 'critical', 'Critical fallback test');
+
+    expect(result.attemptedCount).toBe(2);
+    expect(result.fallbackApplied).toBe(true);
+  });
+
+  test('critical alert does NOT fallback when nukeEnabled users exist', async () => {
+    const { PushoverService } = require('../../src/modules/pushover/pushover.service');
+    const pushoverService = new PushoverService(prisma);
+
+    await createUser('user_nuke1', { pushoverKey: 'uN123456789012345678901234NUKE', nukeEnabled: true });
+    await createUser('user_bell1', {
+      pushoverKey: 'uB987654321098765432109876BELL',
+      ddEnabled: false,
+      pingEnabled: true,
+      nukeEnabled: false,
+    });
+
+    const result = await pushoverService.broadcast('guild1', 'admin1', 'Admin', 'critical', 'Critical no fallback test');
+
+    // Only the nuke-enabled user should be included
+    expect(result.attemptedCount).toBe(1);
+    expect(result.fallbackApplied).toBe(false);
+  });
 });

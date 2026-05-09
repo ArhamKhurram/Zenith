@@ -58,6 +58,9 @@ model GuildConfig {
   // Role IDs that can broadcast alerts (comma-separated)
   adminRoleIds          String?
 
+  // Per-tier role IDs for alert-type specific permissions (JSON: { dd: "roleId", bell: "roleId", trench: "roleId", nuke: "roleId" })
+  tierRoleIds           String?  @db.Text
+
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
 

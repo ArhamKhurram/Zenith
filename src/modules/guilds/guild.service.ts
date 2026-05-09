@@ -97,6 +97,35 @@ export class GuildService {
   }
 
   /**
+   * Updates tier role IDs for a guild.
+   * tierRoleIds is a JSON string mapping alert tiers to Discord role IDs.
+   */
+  async setTierRoles(
+    guildId: string,
+    tierRoleIds: string,
+    guildName?: string,
+  ): Promise<GuildConfigResult> {
+    try {
+      const config = await this.repository.setTierRoles(
+        guildId,
+        guildName || guildId,
+        tierRoleIds,
+      );
+      logger.info('Tier roles updated', { guildId, tierRoleIds });
+      return { success: true, message: 'Tier roles updated.', config };
+    } catch (error: any) {
+      logger.error('Failed to set tier roles', {
+        guildId,
+        error: error.message,
+      });
+      return {
+        success: false,
+        message: 'Failed to update tier roles.',
+      };
+    }
+  }
+
+  /**
    * Checks if a user is an admin for a given guild.
    * Resolves based on GuildConfig adminRoleIds, then ADMINISTRATOR permission.
    */

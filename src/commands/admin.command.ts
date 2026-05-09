@@ -10,6 +10,13 @@ import { GuildService } from '../modules/guilds/guild.service';
 import { UserRepository } from '../modules/users/user.repository';
 import { logger } from '../utils/logger';
 
+interface TierRoleConfig {
+  dd: string;
+  bell: string;
+  trench: string;
+  nuke: string;
+}
+
 export const data = new SlashCommandBuilder()
   .setName('admin')
   .setDescription('Admin tools for managing the bot')
@@ -56,6 +63,16 @@ async function handleConfig(interaction: ChatInputCommandInteraction) {
   const config = await guildService.getOrCreateGuildConfig(guildId, interaction.guild!.name);
   const userCount = await userRepository.findAll();
 
+  // Parse tier roles for display
+  let tierRoles: TierRoleConfig = { dd: 'Not set', bell: 'Not set', trench: 'Not set', nuke: 'Not set' };
+  if (config.tierRoleIds) {
+    try {
+      tierRoles = { ...tierRoles, ...JSON.parse(config.tierRoleIds) };
+    } catch {
+      // Invalid JSON, leave defaults
+    }
+  }
+
   const adminEmbed = new EmbedBuilder()
     .setColor(0x5865f2)
     .setTitle('⚙️ Guild Configuration')
@@ -78,6 +95,16 @@ async function handleConfig(interaction: ChatInputCommandInteraction) {
         inline: false,
       },
       {
+        name: '📋 Tier Role Assignments',
+        value: [
+          `• DD (Silent): ${tierRoles.dd !== 'Not set' ? `<@&${tierRoles.dd}>` : 'Not set'}`,
+          `• Bell (Ping): ${tierRoles.bell !== 'Not set' ? `<@&${tierRoles.bell}>` : 'Not set'}`,
+          `• Trench (Loud): ${tierRoles.trench !== 'Not set' ? `<@&${tierRoles.trench}>` : 'Not set'}`,
+          `• Nuke (Critical): ${tierRoles.nuke !== 'Not set' ? `<@&${tierRoles.nuke}>` : 'Not set'}`,
+        ].join('\n'),
+        inline: false,
+      },
+      {
         name: 'Registered Users',
         value: `${userCount.length}`,
         inline: true,
@@ -90,7 +117,7 @@ async function handleConfig(interaction: ChatInputCommandInteraction) {
     )
     .setFooter({ text: 'Use the buttons below to update settings' });
 
-  const adminRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
+  const configRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
     new ButtonBuilder()
       .setCustomId('admin:set_history_channel')
       .setLabel('Set History Channel')
@@ -101,7 +128,26 @@ async function handleConfig(interaction: ChatInputCommandInteraction) {
       .setStyle(ButtonStyle.Secondary),
   );
 
-  await interaction.reply({ embeds: [adminEmbed], components: [adminRow], ephemeral: true });
+  const tierRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    new ButtonBuilder()
+      .setCustomId('admin:set_tier_dd')
+      .setLabel('Set DD (Silent) Role')
+      .setStyle(ButtonStyle.Primary),
+    new ButtonBuilder()
+      .setCustomId('admin:set_tier_bell')
+      .setLabel('Set Bell (Ping) Role')
+      .setStyle(ButtonStyle.Primary),
+    new ButtonBuilder()
+      .setCustomId('admin:set_tier_trench')
+      .setLabel('Set Trench (Loud) Role')
+      .setStyle(ButtonStyle.Primary),
+    new ButtonBuilder()
+      .setCustomId('admin:set_tier_nuke')
+      .setLabel('Set Nuke (Critical) Role')
+      .setStyle(ButtonStyle.Primary),
+  );
+
+  await interaction.reply({ embeds: [adminEmbed], components: [configRow, tierRow], ephemeral: true });
 }
 
 async function handleHealth(interaction: ChatInputCommandInteraction) {

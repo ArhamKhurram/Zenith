@@ -11,11 +11,11 @@ import { logger } from '../utils/logger';
 export const data = new SlashCommandBuilder()
   .setName('alert')
   .setDescription('Broadcast alerts to registered users')
-  .addSubcommand((subcommand) =>
+  .addSubcommand((subcommand: any) =>
     subcommand
       .setName('all')
       .setDescription('Broadcast alert to all registered users')
-      .addStringOption((option) =>
+      .addStringOption((option: any) =>
         option
           .setName('type')
           .setDescription('Alert type: silent, bell, or critical')
@@ -26,7 +26,7 @@ export const data = new SlashCommandBuilder()
             { name: '🚨 Critical (loud, repeating)', value: 'critical' },
           ),
       )
-      .addStringOption((option) =>
+      .addStringOption((option: any) =>
         option
           .setName('message')
           .setDescription('Alert message content')
@@ -166,6 +166,11 @@ async function handleAlertAll(interaction: ChatInputCommandInteraction) {
       summaryLines.push(`Notified: ${result.successCount} users`);
       summaryLines.push(`Failed: ${result.failureCount} users`);
       summaryLines.push(`Type: Nuke (Emergency)`);
+      if (result.fallbackApplied) {
+        summaryLines.push('');
+        summaryLines.push('⚠️ FALLBACK APPLIED: No users had Nuke (Critical) enabled.');
+        summaryLines.push('Alert was sent to users with Bell or DD settings as fallback.');
+      }
       summaryLines.push('');
       summaryLines.push('⚠️ This alert will retry for 1 hour until acknowledged.');
     } else if (alertType === 'bell') {

@@ -18,7 +18,7 @@ export class GuildRepository {
   async upsert(
     guildId: string,
     guildName: string,
-    data: Partial<Pick<GuildConfig, 'alertHistoryChannelId' | 'adminRoleIds'>>,
+    data: Partial<Pick<GuildConfig, 'alertHistoryChannelId' | 'adminRoleIds' | 'tierRoleIds'>>,
   ): Promise<GuildConfig> {
     return this.prisma.guildConfig.upsert({
       where: { guildId },
@@ -56,6 +56,18 @@ export class GuildRepository {
     roleIds: string,
   ): Promise<GuildConfig> {
     return this.upsert(guildId, guildName, { adminRoleIds: roleIds });
+  }
+
+  /**
+   * Sets the tier role IDs for a guild.
+   * tierRoleIds is a JSON string: { dd: "roleId", bell: "roleId", trench: "roleId", nuke: "roleId" }
+   */
+  async setTierRoles(
+    guildId: string,
+    guildName: string,
+    tierRoleIds: string,
+  ): Promise<GuildConfig> {
+    return this.upsert(guildId, guildName, { tierRoleIds });
   }
 
   /**
