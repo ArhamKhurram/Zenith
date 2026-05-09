@@ -1,30 +1,52 @@
 {
   "name": "zenith",
-  "version": "1.0.0",
-  "main": "src/index.js",
+  "version": "2.0.0",
+  "description": "Zenith Alerts - Discord Pushover notification bot",
+  "main": "dist/index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
+    "test": "jest --passWithNoTests",
+    "test:unit": "jest tests/unit --passWithNoTests",
+    "test:integration": "jest tests/integration --passWithNoTests",
+    "test:coverage": "jest --coverage --passWithNoTests",
+    "prisma:migrate": "npx prisma migrate dev",
+    "prisma:generate": "npx prisma generate",
+    "prisma:studio": "npx prisma studio",
+    "prisma:push": "npx prisma db push",
+    "prepare": "npm run build"
   },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/ArhamKhurram/Zenith.git"
   },
-  "keywords": [],
+  "keywords": [
+    "discord",
+    "pushover",
+    "alerts",
+    "bot"
+  ],
   "author": "",
   "license": "ISC",
   "bugs": {
     "url": "https://github.com/ArhamKhurram/Zenith/issues"
   },
   "homepage": "https://github.com/ArhamKhurram/Zenith#readme",
-  "description": "",
   "dependencies": {
-    "@google/generative-ai": "^0.24.1",
-    "@vitalets/google-translate-api": "^9.2.1",
-    "axios": "^1.9.0",
+    "@prisma/client": "^6.12.0",
     "discord.js": "^14.19.3",
     "dotenv": "^16.5.0",
-    "mongoose": "^8.15.1",
-    "nodemon": "^3.1.10",
-    "openai": "^6.7.0"
+    "node-fetch": "^2.7.0",
+    "prisma": "^6.12.0",
+    "zod": "^3.24.0"
+  },
+  "devDependencies": {
+    "@types/jest": "^29.5.14",
+    "@types/node": "^22.10.0",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.4.9",
+    "ts-node-dev": "^2.0.0",
+    "typescript": "^5.7.0"
   }
 }

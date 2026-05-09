@@ -79,3 +79,5 @@ exports/
 !package.json
 !config.json
 !fnf-keys.json
+
+/src/generated/prisma
